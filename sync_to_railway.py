@@ -18,6 +18,7 @@ FILES = [
     "out/narrative_watchlist.json",
     "out/bitunix_gc_1d.json",
     "out/monitor_hl_exit.json",
+    "out/suggested_exits.json",
 ]
 
 def main() -> int:

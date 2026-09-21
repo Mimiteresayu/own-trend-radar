@@ -1,0 +1,611 @@
+{
+  "ts": "2026-09-21T03:30:00.851861+00:00",
+  "ts_hkt": "2026-09-21 11:30 HKT",
+  "observe_only": true,
+  "banner": "suggested only \u2014 no order changes",
+  "wallet": "0xcFCd\u2026B122",
+  "params": {
+    "n": 2,
+    "nbar_tf": "4h",
+    "mom": "4h_upper",
+    "gc": "hlc3/4/144/1.414 lag=0 fast=0",
+    "h1": "1h_filter",
+    "h4": "4h_filter"
+  },
+  "positions": [
+    {
+      "coin": "BTC",
+      "side": "LONG",
+      "entry": 80529.0,
+      "sz": 0.00142,
+      "mid": 81422.5,
+      "uPnl": 1.26948,
+      "exits": {
+        "h1": {
+          "px": 80571.77578016,
+          "pnl_usd": 0.060742,
+          "pnl_pct": 0.000531,
+          "pnl_pct_ntl": 0.000531,
+          "above_entry": true,
+          "label": "1h_filter",
+          "bar_utc": "2026-09-21T02:00:00+00:00"
+        },
+        "h4": {
+          "px": 77491.5319185,
+          "pnl_usd": -4.313205,
+          "pnl_pct": -0.037719,
+          "pnl_pct_ntl": -0.037719,
+          "above_entry": false,
+          "label": "4h_filter",
+          "bar_utc": "2026-09-20T20:00:00+00:00"
+        },
+        "nbar": {
+          "px": 80587.0,
+          "pnl_usd": 0.08236,
+          "pnl_pct": 0.00072,
+          "pnl_pct_ntl": 0.00072,
+          "above_entry": true,
+          "label": "nbar_2_4h",
+          "n": 2,
+          "component_lows": [
+            80801.0,
+            80587.0
+          ]
+        },
+        "mom": {
+          "px": 78700.45235823,
+          "pnl_usd": -2.596538,
+          "pnl_pct": -0.022707,
+          "pnl_pct_ntl": -0.022707,
+          "above_entry": false,
+          "label": "mom_4h_upper",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "mom_vol_fade": true,
+          "vol_fade_detail": {
+            "fade": true,
+            "recent_mean": 3216.1457,
+            "spike": 28249.754,
+            "ratio": 0.1138,
+            "recent_n": 6
+          }
+        },
+        "mom_fail_1h_filter": {
+          "px": 80571.77578016,
+          "pnl_usd": 0.060742,
+          "pnl_pct": 0.000531,
+          "pnl_pct_ntl": 0.000531,
+          "above_entry": true,
+          "label": "mom_fail_1h_filter"
+        }
+      }
+    },
+    {
+      "coin": "ETH",
+      "side": "LONG",
+      "entry": 2577.0,
+      "sz": 0.0443,
+      "mid": 2666.75,
+      "uPnl": 3.97814,
+      "exits": {
+        "h1": {
+          "px": 2598.51763477,
+          "pnl_usd": 0.953231,
+          "pnl_pct": 0.00835,
+          "pnl_pct_ntl": 0.00835,
+          "above_entry": true,
+          "label": "1h_filter",
+          "bar_utc": "2026-09-21T02:00:00+00:00"
+        },
+        "h4": {
+          "px": 2483.56159911,
+          "pnl_usd": -4.139321,
+          "pnl_pct": -0.036259,
+          "pnl_pct_ntl": -0.036259,
+          "above_entry": false,
+          "label": "4h_filter",
+          "bar_utc": "2026-09-20T20:00:00+00:00"
+        },
+        "nbar": {
+          "px": 2606.6,
+          "pnl_usd": 1.31128,
+          "pnl_pct": 0.011486,
+          "pnl_pct_ntl": 0.011486,
+          "above_entry": true,
+          "label": "nbar_2_4h",
+          "n": 2,
+          "component_lows": [
+            2606.6,
+            2610.0
+          ]
+        },
+        "mom": {
+          "px": 2539.4801163,
+          "pnl_usd": -1.662131,
+          "pnl_pct": -0.01456,
+          "pnl_pct_ntl": -0.01456,
+          "above_entry": false,
+          "label": "mom_4h_upper",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "mom_vol_fade": true,
+          "vol_fade_detail": {
+            "fade": true,
+            "recent_mean": 78869.4202,
+            "spike": 370024.2218,
+            "ratio": 0.2131,
+            "recent_n": 6
+          }
+        },
+        "mom_fail_1h_filter": {
+          "px": 2598.51763477,
+          "pnl_usd": 0.953231,
+          "pnl_pct": 0.00835,
+          "pnl_pct_ntl": 0.00835,
+          "above_entry": true,
+          "label": "mom_fail_1h_filter"
+        }
+      }
+    },
+    {
+      "coin": "SOL",
+      "side": "LONG",
+      "entry": 108.95,
+      "sz": 1.04,
+      "mid": 111.615,
+      "uPnl": 2.7664,
+      "exits": {
+        "h1": {
+          "px": 109.87327714,
+          "pnl_usd": 0.960208,
+          "pnl_pct": 0.008474,
+          "pnl_pct_ntl": 0.008474,
+          "above_entry": true,
+          "label": "1h_filter",
+          "bar_utc": "2026-09-21T02:00:00+00:00"
+        },
+        "h4": {
+          "px": 101.70592324,
+          "pnl_usd": -7.53384,
+          "pnl_pct": -0.06649,
+          "pnl_pct_ntl": -0.06649,
+          "above_entry": false,
+          "label": "4h_filter",
+          "bar_utc": "2026-09-20T20:00:00+00:00"
+        },
+        "nbar": {
+          "px": 108.51,
+          "pnl_usd": -0.4576,
+          "pnl_pct": -0.004039,
+          "pnl_pct_ntl": -0.004039,
+          "above_entry": false,
+          "label": "nbar_2_4h",
+          "n": 2,
+          "component_lows": [
+            108.51,
+            109.14
+          ]
+        },
+        "mom": {
+          "px": 104.29473791,
+          "pnl_usd": -4.841473,
+          "pnl_pct": -0.042728,
+          "pnl_pct_ntl": -0.042728,
+          "above_entry": false,
+          "label": "mom_4h_upper",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "mom_vol_fade": true,
+          "vol_fade_detail": {
+            "fade": true,
+            "recent_mean": 425060.1017,
+            "spike": 1283750.6,
+            "ratio": 0.3311,
+            "recent_n": 6
+          }
+        },
+        "mom_fail_1h_filter": {
+          "px": 109.87327714,
+          "pnl_usd": 0.960208,
+          "pnl_pct": 0.008474,
+          "pnl_pct_ntl": 0.008474,
+          "above_entry": true,
+          "label": "mom_fail_1h_filter"
+        }
+      }
+    },
+    {
+      "coin": "TRX",
+      "side": "LONG",
+      "entry": 0.3403,
+      "sz": 336.0,
+      "mid": 0.343275,
+      "uPnl": 0.99792,
+      "exits": {
+        "h1": {
+          "px": 0.33915865,
+          "pnl_usd": -0.383494,
+          "pnl_pct": -0.003354,
+          "pnl_pct_ntl": -0.003354,
+          "above_entry": false,
+          "label": "1h_filter",
+          "bar_utc": "2026-09-21T02:00:00+00:00"
+        },
+        "h4": {
+          "px": 0.3372552,
+          "pnl_usd": -1.023052,
+          "pnl_pct": -0.008947,
+          "pnl_pct_ntl": -0.008947,
+          "above_entry": false,
+          "label": "4h_filter",
+          "bar_utc": "2026-09-20T20:00:00+00:00"
+        },
+        "nbar": {
+          "px": 0.34267,
+          "pnl_usd": 0.79632,
+          "pnl_pct": 0.006964,
+          "pnl_pct_ntl": 0.006964,
+          "above_entry": true,
+          "label": "nbar_2_4h",
+          "n": 2,
+          "component_lows": [
+            0.3432,
+            0.34267
+          ]
+        },
+        "mom": {
+          "px": 0.33967758,
+          "pnl_usd": -0.209134,
+          "pnl_pct": -0.001829,
+          "pnl_pct_ntl": -0.001829,
+          "above_entry": false,
+          "label": "mom_4h_upper",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "mom_vol_fade": false,
+          "vol_fade_detail": {
+            "fade": false,
+            "recent_mean": 1408042.0,
+            "spike": 3270435.0,
+            "ratio": 0.4305,
+            "recent_n": 6
+          }
+        },
+        "mom_fail_1h_filter": {
+          "px": 0.33915865,
+          "pnl_usd": -0.383494,
+          "pnl_pct": -0.003354,
+          "pnl_pct_ntl": -0.003354,
+          "above_entry": false,
+          "label": "mom_fail_1h_filter"
+        }
+      }
+    },
+    {
+      "coin": "BRETT",
+      "side": "LONG",
+      "entry": 0.005294,
+      "sz": 21623.0,
+      "mid": 0.005375,
+      "uPnl": 1.789321,
+      "exits": {
+        "h1": {
+          "px": 0.00521345,
+          "pnl_usd": -1.741709,
+          "pnl_pct": -0.015215,
+          "pnl_pct_ntl": -0.015215,
+          "above_entry": false,
+          "label": "1h_filter",
+          "bar_utc": "2026-09-21T02:00:00+00:00"
+        },
+        "h4": {
+          "px": 0.00490456,
+          "pnl_usd": -8.42096,
+          "pnl_pct": -0.073563,
+          "pnl_pct_ntl": -0.073563,
+          "above_entry": false,
+          "label": "4h_filter",
+          "bar_utc": "2026-09-20T20:00:00+00:00"
+        },
+        "nbar": {
+          "px": 0.005193,
+          "pnl_usd": -2.183923,
+          "pnl_pct": -0.019078,
+          "pnl_pct_ntl": -0.019078,
+          "above_entry": false,
+          "label": "nbar_2_4h",
+          "n": 2,
+          "component_lows": [
+            0.005193,
+            0.005265
+          ]
+        },
+        "mom": {
+          "px": 0.00511054,
+          "pnl_usd": -3.967038,
+          "pnl_pct": -0.034655,
+          "pnl_pct_ntl": -0.034655,
+          "above_entry": false,
+          "label": "mom_4h_upper",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "mom_vol_fade": true,
+          "vol_fade_detail": {
+            "fade": true,
+            "recent_mean": 5568465.6667,
+            "spike": 21630259.0,
+            "ratio": 0.2574,
+            "recent_n": 6
+          }
+        },
+        "mom_fail_1h_filter": {
+          "px": 0.00521345,
+          "pnl_usd": -1.741709,
+          "pnl_pct": -0.015215,
+          "pnl_pct_ntl": -0.015215,
+          "above_entry": false,
+          "label": "mom_fail_1h_filter"
+        }
+      }
+    },
+    {
+      "coin": "HYPE",
+      "side": "LONG",
+      "entry": 91.104,
+      "sz": 1.25,
+      "mid": 92.9965,
+      "uPnl": 2.375,
+      "exits": {
+        "h1": {
+          "px": 91.16880076,
+          "pnl_usd": 0.081001,
+          "pnl_pct": 0.000711,
+          "pnl_pct_ntl": 0.000711,
+          "above_entry": true,
+          "label": "1h_filter",
+          "bar_utc": "2026-09-21T02:00:00+00:00"
+        },
+        "h4": {
+          "px": 81.43846574,
+          "pnl_usd": -12.081918,
+          "pnl_pct": -0.106093,
+          "pnl_pct_ntl": -0.106093,
+          "above_entry": false,
+          "label": "4h_filter",
+          "bar_utc": "2026-09-20T20:00:00+00:00"
+        },
+        "nbar": {
+          "px": 91.944,
+          "pnl_usd": 1.05,
+          "pnl_pct": 0.00922,
+          "pnl_pct_ntl": 0.00922,
+          "above_entry": true,
+          "label": "nbar_2_4h",
+          "n": 2,
+          "component_lows": [
+            91.944,
+            92.006
+          ]
+        },
+        "mom": {
+          "px": 84.14308537,
+          "pnl_usd": -8.701143,
+          "pnl_pct": -0.076406,
+          "pnl_pct_ntl": -0.076406,
+          "above_entry": false,
+          "label": "mom_4h_upper",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "mom_vol_fade": true,
+          "vol_fade_detail": {
+            "fade": true,
+            "recent_mean": 690361.32,
+            "spike": 3552800.62,
+            "ratio": 0.1943,
+            "recent_n": 6
+          }
+        },
+        "mom_fail_1h_filter": {
+          "px": 91.16880076,
+          "pnl_usd": 0.081001,
+          "pnl_pct": 0.000711,
+          "pnl_pct_ntl": 0.000711,
+          "above_entry": true,
+          "label": "mom_fail_1h_filter"
+        }
+      }
+    },
+    {
+      "coin": "NIL",
+      "side": "LONG",
+      "entry": 0.050174,
+      "sz": 2279.0,
+      "mid": 0.063972,
+      "uPnl": 31.579957,
+      "exits": {
+        "h1": {
+          "px": 0.04832385,
+          "pnl_usd": -4.216493,
+          "pnl_pct": -0.036875,
+          "pnl_pct_ntl": -0.036875,
+          "above_entry": false,
+          "label": "1h_filter",
+          "bar_utc": "2026-09-21T02:00:00+00:00"
+        },
+        "h4": {
+          "px": 0.04285469,
+          "pnl_usd": -16.680708,
+          "pnl_pct": -0.145879,
+          "pnl_pct_ntl": -0.145879,
+          "above_entry": false,
+          "label": "4h_filter",
+          "bar_utc": "2026-09-20T20:00:00+00:00"
+        },
+        "nbar": {
+          "px": 0.050335,
+          "pnl_usd": 0.366919,
+          "pnl_pct": 0.003209,
+          "pnl_pct_ntl": 0.003209,
+          "above_entry": true,
+          "label": "nbar_2_4h",
+          "n": 2,
+          "component_lows": [
+            0.050335,
+            0.058675
+          ]
+        },
+        "mom": {
+          "px": 0.04452764,
+          "pnl_usd": -12.868044,
+          "pnl_pct": -0.112535,
+          "pnl_pct_ntl": -0.112535,
+          "above_entry": false,
+          "label": "mom_4h_upper",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "mom_vol_fade": false,
+          "vol_fade_detail": {
+            "fade": false,
+            "recent_mean": 7145079.6667,
+            "spike": 19684887.0,
+            "ratio": 0.363,
+            "recent_n": 6
+          }
+        },
+        "mom_fail_1h_filter": {
+          "px": 0.04832385,
+          "pnl_usd": -4.216493,
+          "pnl_pct": -0.036875,
+          "pnl_pct_ntl": -0.036875,
+          "above_entry": false,
+          "label": "mom_fail_1h_filter"
+        }
+      }
+    },
+    {
+      "coin": "AVNT",
+      "side": "LONG",
+      "entry": 0.110311,
+      "sz": 1006.0,
+      "mid": 0.110535,
+      "uPnl": 0.25046,
+      "exits": {
+        "h1": {
+          "px": 0.1072468,
+          "pnl_usd": -3.082589,
+          "pnl_pct": -0.027778,
+          "pnl_pct_ntl": -0.027778,
+          "above_entry": false,
+          "label": "1h_filter",
+          "bar_utc": "2026-09-21T02:00:00+00:00"
+        },
+        "h4": {
+          "px": 0.09988552,
+          "pnl_usd": -10.488035,
+          "pnl_pct": -0.09451,
+          "pnl_pct_ntl": -0.09451,
+          "above_entry": false,
+          "label": "4h_filter",
+          "bar_utc": "2026-09-20T20:00:00+00:00"
+        },
+        "nbar": {
+          "px": 0.10687,
+          "pnl_usd": -3.461646,
+          "pnl_pct": -0.031194,
+          "pnl_pct_ntl": -0.031194,
+          "above_entry": false,
+          "label": "nbar_2_4h",
+          "n": 2,
+          "component_lows": [
+            0.10687,
+            0.10812
+          ]
+        },
+        "mom": {
+          "px": 0.10342465,
+          "pnl_usd": -6.927669,
+          "pnl_pct": -0.062427,
+          "pnl_pct_ntl": -0.062427,
+          "above_entry": false,
+          "label": "mom_4h_upper",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "mom_vol_fade": false,
+          "vol_fade_detail": {
+            "fade": false,
+            "recent_mean": 551055.8333,
+            "spike": 1151687.0,
+            "ratio": 0.4785,
+            "recent_n": 6
+          }
+        },
+        "mom_fail_1h_filter": {
+          "px": 0.1072468,
+          "pnl_usd": -3.082589,
+          "pnl_pct": -0.027778,
+          "pnl_pct_ntl": -0.027778,
+          "above_entry": false,
+          "label": "mom_fail_1h_filter"
+        }
+      }
+    },
+    {
+      "coin": "ZEC",
+      "side": "LONG",
+      "entry": 1449.1,
+      "sz": 0.07,
+      "mid": 1520.25,
+      "uPnl": 5.012,
+      "exits": {
+        "h1": {
+          "px": 1486.91539703,
+          "pnl_usd": 2.647078,
+          "pnl_pct": 0.026096,
+          "pnl_pct_ntl": 0.026096,
+          "above_entry": true,
+          "label": "1h_filter",
+          "bar_utc": "2026-09-21T02:00:00+00:00"
+        },
+        "h4": {
+          "px": 1230.49046476,
+          "pnl_usd": -15.302667,
+          "pnl_pct": -0.150859,
+          "pnl_pct_ntl": -0.150859,
+          "above_entry": false,
+          "label": "4h_filter",
+          "bar_utc": "2026-09-20T20:00:00+00:00"
+        },
+        "nbar": {
+          "px": 1440.0,
+          "pnl_usd": -0.637,
+          "pnl_pct": -0.00628,
+          "pnl_pct_ntl": -0.00628,
+          "above_entry": false,
+          "label": "nbar_2_4h",
+          "n": 2,
+          "component_lows": [
+            1440.0,
+            1470.5
+          ]
+        },
+        "mom": {
+          "px": 1307.66668574,
+          "pnl_usd": -9.900332,
+          "pnl_pct": -0.097601,
+          "pnl_pct_ntl": -0.097601,
+          "above_entry": false,
+          "label": "mom_4h_upper",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "mom_vol_fade": true,
+          "vol_fade_detail": {
+            "fade": true,
+            "recent_mean": 64263.0483,
+            "spike": 341429.56,
+            "ratio": 0.1882,
+            "recent_n": 6
+          }
+        },
+        "mom_fail_1h_filter": {
+          "px": 1486.91539703,
+          "pnl_usd": 2.647078,
+          "pnl_pct": 0.026096,
+          "pnl_pct_ntl": 0.026096,
+          "above_entry": true,
+          "label": "mom_fail_1h_filter"
+        }
+      }
+    }
+  ]
+}

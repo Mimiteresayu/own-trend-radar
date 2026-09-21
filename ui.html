@@ -486,7 +486,7 @@
     border-collapse: collapse;
     font-family: var(--mono);
     font-size: 0.8rem;
-    min-width: 860px;
+    min-width: 1100px;
   }
   th, td {
     padding: 8px 10px;
@@ -517,6 +517,21 @@
   tr.hl-down { background: var(--red-dim); }
   tr.hl-down:hover { background: rgba(239, 68, 68, 0.22); }
   .trend-g { color: var(--green); font-weight: 700; }
+  .exit-cell { font-family: var(--mono); font-size: 0.68rem; line-height: 1.25; text-align: right; }
+  .exit-cell .px { color: var(--muted); display: block; }
+  .exit-cell .pnl.pos { color: var(--green); font-weight: 700; }
+  .exit-cell .pnl.neg { color: var(--red); font-weight: 700; }
+  .exit-cell .fade { color: var(--amber); font-size: 0.6rem; }
+  .observe-banner {
+    margin: 8px 0 10px; padding: 8px 12px; border-radius: 6px;
+    background: rgba(245, 158, 11, 0.12); border: 1px solid #6b4e12;
+    color: var(--amber); font-size: 0.78rem; font-weight: 600;
+  }
+  .pos-exits { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 4px; }
+  .pos-exits .ex { font-family: var(--mono); font-size: 0.62rem; color: var(--muted); }
+  .pos-exits .ex .pnl.pos { color: var(--green); }
+  .pos-exits .ex .pnl.neg { color: var(--red); }
+
   .trend-r { color: var(--red); font-weight: 700; }
   .bool-y { color: var(--green); }
   .bool-n { color: #3a4656; }
@@ -727,8 +742,10 @@
       <div class="flags" id="deskSot"></div>
     </section>
     <h3 style="margin:12px 0 8px;font-size:0.95rem;color:var(--muted)">Positions</h3>
+    <div class="observe-banner" id="deskExitBanner">suggested only — no order changes</div>
     <div class="table-wrap"><table><thead><tr>
       <th>coin</th><th>side</th><th>size</th><th>entry</th><th>value</th><th>uPnL</th><th>lev</th><th>liq</th>
+      <th>1H</th><th>4H</th><th>Nbar</th><th>Mom</th>
     </tr></thead><tbody id="deskPos"></tbody></table></div>
     <h3 style="margin:16px 0 8px;font-size:0.95rem;color:var(--muted)">Candidates</h3>
     <div class="table-wrap"><table><thead><tr>
@@ -1056,10 +1073,20 @@
         ? pos.map((p) => {
             const cls = signedClass(p.uPnl);
             const side = String(p.side || "").toUpperCase();
+            const se = p.suggested_exits || {};
+            const exLine = (lab, ex) => {
+              if (!ex || ex.px == null) return `<div class="ex">${lab} —</div>`;
+              const pnl = Number(ex.pnl_usd);
+              const pc = pnl >= 0 ? "pos" : "neg";
+              const s = pnl >= 0 ? "+" : "";
+              const fade = ex.mom_vol_fade ? "↓" : "";
+              return `<div class="ex">${lab} <span class="pnl ${pc}">${s}$${Math.abs(pnl).toFixed(1)}</span>${fade}</div>`;
+            };
             return `<div class="pos-item">
               <div><div class="coin">${escapeHtml(p.coin)}</div><div class="${side === "LONG" ? "side-long" : "side-short"}">${side}</div></div>
               <div class="meta">val ${fmtUsd(p.positionValue)} · ${p.leverage || "—"}x</div>
               <div class="${cls}">${fmtUsd(p.uPnl)}</div>
+              <div class="pos-exits">${exLine("1H", se.h1)}${exLine("4H", se.h4)}${exLine("Nb", se.nbar)}${exLine("Mom", se.mom)}</div>
             </div>`;
           }).join("")
         : '<div class="empty-hint">No open positions</div>';
@@ -1166,6 +1193,16 @@
     }
   }
 
+
+  function fmtExitCell(ex) {
+    if (!ex || ex.px == null) return '<span class="exit-cell">—</span>';
+    const pnl = Number(ex.pnl_usd);
+    const cls = pnl >= 0 ? "pos" : "neg";
+    const sign = pnl >= 0 ? "+" : "";
+    const fade = ex.mom_vol_fade ? '<span class="fade"> vol↓</span>' : "";
+    return `<span class="exit-cell"><span class="px">${fmtNum(ex.px)}</span><span class="pnl ${cls}">${sign}$${Math.abs(pnl).toFixed(2)}</span>${fade}</span>`;
+  }
+
   /* ——— Desk ——— */
   async function loadDesk() {
     showView("desk");
@@ -1186,8 +1223,10 @@
       const pos = d.positions || [];
       el("deskPos").innerHTML = pos.length ? pos.map((p) => {
         const cls = (p.uPnl || 0) >= 0 ? "trend-g" : "trend-r";
-        return `<tr><td>${p.coin}</td><td>${p.side}</td><td>${p.size}</td><td>${fmtNum(p.entry)}</td><td>${fmtNum(p.positionValue)}</td><td class="${cls}">${p.uPnl}</td><td>${p.leverage || "—"}</td><td>${p.liq ?? "—"}</td></tr>`;
-      }).join("") : `<tr><td colspan="8" style="color:var(--muted)">No positions</td></tr>`;
+        const se = p.suggested_exits || {};
+        return `<tr><td>${p.coin}</td><td>${p.side}</td><td>${p.size}</td><td>${fmtNum(p.entry)}</td><td>${fmtNum(p.positionValue)}</td><td class="${cls}">${p.uPnl}</td><td>${p.leverage || "—"}</td><td>${p.liq ?? "—"}</td>
+          <td>${fmtExitCell(se.h1)}</td><td>${fmtExitCell(se.h4)}</td><td>${fmtExitCell(se.nbar)}</td><td>${fmtExitCell(se.mom)}</td></tr>`;
+      }).join("") : `<tr><td colspan="12" style="color:var(--muted)">No positions</td></tr>`;
 
       // flatten candidates dict
       const c = d.candidates || {};

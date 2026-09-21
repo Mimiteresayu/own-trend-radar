@@ -1,0 +1,683 @@
+#!/usr/bin/env python3
+"""
+Own Trend Radar — multi-timeframe GC scan (DRY_RUN, no trading).
+
+GC math: DonovanWall / Signum Strategy v3.3
+  source=hlc3, poles=4, period=144, mult=1.414, Reduced Lag ON, Fast Response ON
+Ported from /workspace/signum-compat-gc/gc.ts
+
+Usage:
+  python scan_gc_radar.py              # scan 2h + 4h + 1d
+  python scan_gc_radar.py --tf 1d      # single TF
+  python scan_gc_radar.py --tf 1h,4h   # subset
+  python scan_gc_radar.py --max 80     # smaller universe (e.g. for 1h smoke)
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import math
+import os
+import shutil
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
+
+try:
+    import requests
+except ImportError:  # pragma: no cover
+    requests = None  # type: ignore
+
+# ---------------------------------------------------------------------------
+# Paths / constants
+# ---------------------------------------------------------------------------
+ROOT = os.path.dirname(os.path.abspath(__file__))
+OUT_DIR = os.path.join(ROOT, "out")
+CANDIDATES_PATH = "/workspace/own_radar_candidates_base_v0.json"
+HL_INFO = "https://api.hyperliquid.xyz/info"
+
+MAX_SYMBOLS = 150  # Signum-like Top 100-150
+CONCURRENCY = 4  # polite; scanning 150×3 TFs is heavy
+REQUEST_PAUSE_S = 0.20  # polite rate limit between requests in a worker
+HL_VOLUME_JSON = "/workspace/hl_volume_top100.json"
+
+GC_POLES = 4
+GC_PERIOD = 144
+GC_MULT = 1.414
+GC_REDUCED_LAG = False
+GC_FAST_RESPONSE = False
+
+# HL candleSnapshot intervals (verified: 2h, 4h, 1d; Lag/Fast OFF = DW defaults)
+VALID_TFS = ("1h", "2h", "4h", "1d")
+
+# Bar fetch windows (enough warmup for period=144 + lag)
+# 1h: ~400 bars (~16d) — positions-only scans; period=144 needs warmup
+# 1d: ~280 days (existing)
+# 4h: ~450 bars (~75 days) — period*4h ≈ 24d min; fetch 400-500
+# 2h: ~500 bars (~40 days)
+TF_CONFIG: Dict[str, Dict[str, Any]] = {
+    "1h": {
+        "interval": "1h",
+        "bar_ms": 3600 * 1000,
+        "n_bars": 400,
+        "out_stem": "gc_radar_1h",
+    },
+    "2h": {
+        "interval": "2h",
+        "bar_ms": 2 * 3600 * 1000,
+        "n_bars": 500,
+        "out_stem": "gc_radar_2h",
+    },
+    "4h": {
+        "interval": "4h",
+        "bar_ms": 4 * 3600 * 1000,
+        "n_bars": 450,
+        "out_stem": "gc_radar_4h",
+    },
+    "1d": {
+        "interval": "1d",
+        "bar_ms": 86400 * 1000,
+        "n_bars": 280,
+        "out_stem": "gc_radar_1d",
+        "alias_stem": "daily_gc_radar",  # back-compat
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# HTTP
+# ---------------------------------------------------------------------------
+def hl_post(body: dict, timeout: float = 30.0, retries: int = 4) -> Any:
+    """POST to HL info with polite retries on 429/5xx."""
+    last_err: Optional[Exception] = None
+    for attempt in range(retries):
+        try:
+            if requests is not None:
+                r = requests.post(HL_INFO, json=body, timeout=timeout)
+                if r.status_code == 429 or r.status_code >= 500:
+                    raise RuntimeError(f"HTTP {r.status_code}")
+                r.raise_for_status()
+                return r.json()
+            # stdlib fallback
+            import urllib.request
+
+            data = json.dumps(body).encode("utf-8")
+            req = urllib.request.Request(
+                HL_INFO,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            last_err = e
+            sleep_s = 1.5 * (2 ** attempt)
+            print(
+                f"[retry] hl_post attempt={attempt+1}/{retries} sleep={sleep_s:.1f}s err={e}",
+                file=sys.stderr,
+            )
+            time.sleep(sleep_s)
+    assert last_err is not None
+    raise last_err
+
+
+# ---------------------------------------------------------------------------
+# Universe
+# ---------------------------------------------------------------------------
+def load_base_v0(path: str = CANDIDATES_PATH, max_n: int = MAX_SYMBOLS) -> Optional[List[str]]:
+    """Optional secondary filter list (not primary universe)."""
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        syms = data.get("symbols") or []
+        if not isinstance(syms, list) or len(syms) < 10:
+            return None
+        names: List[str] = []
+        for s in syms:
+            if isinstance(s, dict) and s.get("symbol"):
+                names.append(str(s["symbol"]))
+            elif isinstance(s, str):
+                names.append(s)
+        names = [n for n in names if n]
+        if len(names) < 10:
+            return None
+        return names[:max_n]
+    except Exception as e:
+        print(f"[warn] base_v0 load failed: {e}", file=sys.stderr)
+        return None
+
+
+def fetch_meta_universe() -> Tuple[List[Tuple[str, float]], List[str]]:
+    """
+    Returns ([(name, dayNtlVlm), ...] sorted desc by vol), and meta universe names
+    in exchange order (non-delisted).
+    """
+    payload = hl_post({"type": "metaAndAssetCtxs"})
+    meta, ctxs = payload[0], payload[1]
+    universe = meta.get("universe") or []
+    rows: List[Tuple[str, float]] = []
+    names_order: List[str] = []
+    for i, u in enumerate(universe):
+        name = u.get("name")
+        if not name or u.get("isDelisted"):
+            continue
+        names_order.append(name)
+        ctx = ctxs[i] if i < len(ctxs) else {}
+        try:
+            vol = float(ctx.get("dayNtlVlm") or 0)
+        except (TypeError, ValueError):
+            vol = 0.0
+        rows.append((name, vol))
+    rows.sort(key=lambda x: x[1], reverse=True)
+    return rows, names_order
+
+
+def load_hl_volume_json(path: str = HL_VOLUME_JSON, max_n: int = 100) -> List[str]:
+    """Cached HL dayNtlVlm top100 file (fallback when live vols are zero)."""
+    if not os.path.isfile(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        top = data.get("top100") or []
+        names: List[str] = []
+        for row in top:
+            if isinstance(row, dict) and row.get("symbol"):
+                names.append(str(row["symbol"]))
+            elif isinstance(row, str):
+                names.append(row)
+        return [n for n in names if n][:max_n]
+    except Exception as e:
+        print(f"[warn] hl_volume_top100.json load failed: {e}", file=sys.stderr)
+        return []
+
+
+def pad_from_meta(names: List[str], meta_names: List[str], max_n: int) -> List[str]:
+    """Pad symbol list up to max_n using meta universe names (preserve order, unique)."""
+    seen = set(names)
+    out = list(names)
+    for n in meta_names:
+        if len(out) >= max_n:
+            break
+        if n not in seen:
+            seen.add(n)
+            out.append(n)
+    return out[:max_n]
+
+
+def load_universe(max_n: int = MAX_SYMBOLS) -> Tuple[List[str], str]:
+    """
+    Primary: HL metaAndAssetCtxs ranked by dayNtlVlm (Top 100-150 Signum scale).
+    If live dayNtlVlm are all/mostly zero: hl_volume_top100.json then pad from meta.
+    base_v0 is secondary/filter only (intersect if available; never primary).
+    """
+    vol_rows, meta_names = fetch_meta_universe()
+    nonzero = sum(1 for _, v in vol_rows if v > 0)
+    if nonzero >= max(20, max_n // 5):
+        names = [n for n, _ in vol_rows[:max_n]]
+        src = "hl_dayNtlVlm"
+    else:
+        print(
+            f"[warn] dayNtlVlm mostly zero (nonzero={nonzero}); "
+            f"falling back to {HL_VOLUME_JSON}",
+            file=sys.stderr,
+        )
+        cached = load_hl_volume_json(max_n=100)
+        if cached:
+            names = pad_from_meta(cached, meta_names, max_n)
+            src = "hl_volume_top100.json+meta_pad"
+        else:
+            names = meta_names[:max_n]
+            src = "hl_meta_universe"
+
+    base = load_base_v0(max_n=max_n * 2)
+    if base:
+        base_set = set(base)
+        preferred = [n for n in names if n in base_set]
+        rest = [n for n in names if n not in base_set]
+        filtered = (preferred + rest)[:max_n]
+        if len(preferred) >= 10:
+            print(
+                f"[info] base_v0 secondary filter: {len(preferred)}/{len(names)} overlap "
+                f"(kept volume order, padded to {len(filtered)})",
+                file=sys.stderr,
+            )
+            names = filtered
+            src = src + "+base_v0_filter"
+
+    return names, src
+
+
+# ---------------------------------------------------------------------------
+# Candles
+# ---------------------------------------------------------------------------
+def fetch_candles(coin: str, tf: str) -> List[dict]:
+    """
+    HL candleSnapshot for interval tf (1h|2h|4h|1d).
+    Returns list of {t, open, high, low, close, volume}.
+    """
+    cfg = TF_CONFIG[tf]
+    end_ms = int(time.time() * 1000)
+    start_ms = end_ms - int(cfg["n_bars"]) * int(cfg["bar_ms"])
+    # pad start a bit for incomplete first bar / clock skew
+    start_ms -= int(cfg["bar_ms"])
+    body = {
+        "type": "candleSnapshot",
+        "req": {
+            "coin": coin,
+            "interval": cfg["interval"],
+            "startTime": start_ms,
+            "endTime": end_ms,
+        },
+    }
+    time.sleep(REQUEST_PAUSE_S)
+    raw = hl_post(body)
+    if not isinstance(raw, list):
+        return []
+    bars: List[dict] = []
+    for c in raw:
+        try:
+            bars.append(
+                {
+                    "t": int(c["t"]),
+                    "open": float(c["o"]),
+                    "high": float(c["h"]),
+                    "low": float(c["l"]),
+                    "close": float(c["c"]),
+                    "volume": float(c.get("v") or 0),
+                }
+            )
+        except (KeyError, TypeError, ValueError):
+            continue
+    bars.sort(key=lambda b: b["t"])
+    return bars
+
+
+# ---------------------------------------------------------------------------
+# Gaussian Channel (DW / Signum v3.3)
+# ---------------------------------------------------------------------------
+def _true_range(highs: List[float], lows: List[float], closes: List[float], i: int) -> float:
+    if i == 0:
+        return highs[0] - lows[0]
+    prev_c = closes[i - 1]
+    return max(highs[i] - lows[i], abs(highs[i] - prev_c), abs(lows[i] - prev_c))
+
+
+def _pole_weights(i: int) -> Tuple[int, int, int, int, int, int, int, int]:
+    table = {
+        1: (0, 0, 0, 0, 0, 0, 0, 0),
+        2: (1, 0, 0, 0, 0, 0, 0, 0),
+        3: (3, 1, 0, 0, 0, 0, 0, 0),
+        4: (6, 4, 1, 0, 0, 0, 0, 0),
+        5: (10, 10, 5, 1, 0, 0, 0, 0),
+        6: (15, 20, 15, 6, 1, 0, 0, 0),
+        7: (21, 35, 35, 21, 7, 1, 0, 0),
+        8: (28, 56, 70, 56, 28, 8, 1, 0),
+        9: (36, 84, 126, 126, 84, 36, 9, 1),
+    }
+    return table[i]
+
+
+def pole_filter(alpha: float, data: List[float], N: int) -> Tuple[List[float], List[float]]:
+    """Stateful N-pole Ehlers gaussian filter. Returns (fn, f1)."""
+    n = len(data)
+    x = 1.0 - alpha
+    f: List[List[float]] = [[0.0] * n for _ in range(10)]
+
+    for i in range(1, N + 1):
+        m2, m3, m4, m5, m6, m7, m8, m9 = _pole_weights(i)
+        a_pow = alpha**i
+        for t in range(n):
+            s = data[t]
+            v = a_pow * s + i * x * (f[i][t - 1] if t >= 1 else 0.0)
+            if i >= 2:
+                v -= m2 * (x**2) * (f[i][t - 2] if t >= 2 else 0.0)
+            if i >= 3:
+                v += m3 * (x**3) * (f[i][t - 3] if t >= 3 else 0.0)
+            if i >= 4:
+                v -= m4 * (x**4) * (f[i][t - 4] if t >= 4 else 0.0)
+            if i >= 5:
+                v += m5 * (x**5) * (f[i][t - 5] if t >= 5 else 0.0)
+            if i >= 6:
+                v -= m6 * (x**6) * (f[i][t - 6] if t >= 6 else 0.0)
+            if i >= 7:
+                v += m7 * (x**7) * (f[i][t - 7] if t >= 7 else 0.0)
+            if i >= 8:
+                v -= m8 * (x**8) * (f[i][t - 8] if t >= 8 else 0.0)
+            if i == 9:
+                v += m9 * (x**9) * (f[i][t - 9] if t >= 9 else 0.0)
+            f[i][t] = v
+    return f[N], f[1]
+
+
+def compute_gc(
+    highs: List[float],
+    lows: List[float],
+    closes: List[float],
+    poles: int = GC_POLES,
+    period: int = GC_PERIOD,
+    mult: float = GC_MULT,
+    reduced_lag: bool = GC_REDUCED_LAG,
+    fast_response: bool = GC_FAST_RESPONSE,
+) -> List[Dict[str, float]]:
+    n = len(closes)
+    if n == 0:
+        return []
+
+    beta = (1.0 - math.cos((4.0 * math.asin(1.0)) / period)) / (math.pow(1.414, 2.0 / poles) - 1.0)
+    alpha = -beta + math.sqrt(beta * beta + 2.0 * beta)
+    lag = int(round((period - 1) / (2.0 * poles)))
+
+    src = [(highs[i] + lows[i] + closes[i]) / 3.0 for i in range(n)]
+    tr = [_true_range(highs, lows, closes, i) for i in range(n)]
+
+    if reduced_lag:
+        srcdata = [src[i] + (src[i] - src[i - lag]) if i >= lag else src[i] for i in range(n)]
+        trdata = [tr[i] + (tr[i] - tr[i - lag]) if i >= lag else tr[i] for i in range(n)]
+    else:
+        srcdata, trdata = src, tr
+
+    filtn, filt1 = pole_filter(alpha, srcdata, poles)
+    filtntr, filt1tr = pole_filter(alpha, trdata, poles)
+
+    out: List[Dict[str, float]] = []
+    for i in range(n):
+        filt = (filtn[i] + filt1[i]) / 2.0 if fast_response else filtn[i]
+        filttr = (filtntr[i] + filt1tr[i]) / 2.0 if fast_response else filtntr[i]
+        out.append(
+            {
+                "filter": filt,
+                "upper": filt + filttr * mult,
+                "lower": filt - filttr * mult,
+            }
+        )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Per-symbol scan row
+# ---------------------------------------------------------------------------
+def scan_symbol(coin: str, tf: str) -> Optional[dict]:
+    bars = fetch_candles(coin, tf)
+    min_bars = GC_PERIOD + 20
+    if len(bars) < min_bars:
+        print(
+            f"[skip] {coin}@{tf}: only {len(bars)} bars (need >={min_bars})",
+            file=sys.stderr,
+        )
+        return None
+
+    highs = [b["high"] for b in bars]
+    lows = [b["low"] for b in bars]
+    closes = [b["close"] for b in bars]
+    gc = compute_gc(highs, lows, closes)
+    # Use latest CLOSED daily/TF bar only (avoid showing yesterday's cross as "today")
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    bar_ms = TF_CONFIG[tf]["bar_ms"]
+    i = len(gc) - 1
+    while i >= 1 and bars[i]["t"] + bar_ms > now_ms:
+        i -= 1
+    if i < 1:
+        return None
+
+    filt = gc[i]["filter"]
+    prev_filt = gc[i - 1]["filter"]
+    upper = gc[i]["upper"]
+    prev_upper = gc[i - 1]["upper"]
+    lower = gc[i]["lower"]
+    close = closes[i]
+    prev_close = closes[i - 1]
+
+    trend = "Green" if filt > prev_filt else "Red"
+    above_upper = close > upper
+    dual_cross_up = close > upper and prev_close <= prev_upper
+    dual_cross_down_filter = close < filt and prev_close >= prev_filt
+    last_cross_up_at = None
+    for j in range(i, 0, -1):
+        if closes[j - 1] <= gc[j - 1]["upper"] and closes[j] > gc[j]["upper"]:
+            last_cross_up_at = bars[j]["t"]
+            break
+
+    ath = max(highs)
+    atl = min(lows)
+    drop_from_ath_pct = round((ath - close) / ath * 100, 2) if ath else None
+    from_atl_pct = round((close - atl) / atl * 100, 2) if atl else None
+
+    return {
+        "symbol": coin,
+        "close": round(close, 8),
+        "filter": round(filt, 8),
+        "upper": round(upper, 8),
+        "lower": round(lower, 8),
+        "trend": trend,
+        "above_upper": above_upper,
+        "dual_cross_up": dual_cross_up,
+        "dual_cross_down_filter": dual_cross_down_filter,
+        "ath": round(ath, 8),
+        "atl": round(atl, 8),
+        "drop_from_ath_pct": drop_from_ath_pct,
+        "from_atl_pct": from_atl_pct,
+        "last_cross_up_at": last_cross_up_at,
+        "bars": len(bars),
+        "bar_time": bars[i]["t"],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Scan one TF + write outputs
+# ---------------------------------------------------------------------------
+CSV_FIELDS = [
+    "symbol",
+    "close",
+    "filter",
+    "upper",
+    "lower",
+    "trend",
+    "above_upper",
+    "dual_cross_up",
+    "dual_cross_down_filter",
+    "ath",
+    "atl",
+    "drop_from_ath_pct",
+    "from_atl_pct",
+    "bars",
+    "bar_time",
+]
+
+
+def scan_tf(
+    tf: str,
+    symbols: List[str],
+    universe_src: str,
+    concurrency: int = CONCURRENCY,
+) -> dict:
+    """Scan all symbols for one TF; write JSON+CSV; return summary payload."""
+    t0 = time.time()
+    ts = datetime.now(timezone.utc).isoformat()
+    cfg = TF_CONFIG[tf]
+    print(f"\n[tf={tf}] scanning n={len(symbols)} interval={cfg['interval']} "
+          f"n_bars~={cfg['n_bars']} concurrency={concurrency}")
+
+    rows: List[dict] = []
+    errors: List[str] = []
+
+    def _job(sym: str) -> Tuple[str, Optional[dict], Optional[str]]:
+        try:
+            return sym, scan_symbol(sym, tf), None
+        except Exception as e:
+            return sym, None, str(e)
+
+    with ThreadPoolExecutor(max_workers=concurrency) as ex:
+        futs = {ex.submit(_job, s): s for s in symbols}
+        for fut in as_completed(futs):
+            sym, row, err = fut.result()
+            if err:
+                print(f"[err] {sym}@{tf}: {err}", file=sys.stderr)
+                errors.append(f"{sym}: {err}")
+            elif row:
+                rows.append(row)
+                flag = ""
+                if row["dual_cross_up"]:
+                    flag = " DUAL_UP"
+                elif row["dual_cross_down_filter"]:
+                    flag = " DUAL_DN_FILT"
+                print(f"  [{tf}] {row['symbol']:12s} {row['trend']:5s} close={row['close']}{flag}")
+
+    rows.sort(key=lambda r: r["symbol"])
+
+    green_count = sum(1 for r in rows if r["trend"] == "Green")
+    red_count = sum(1 for r in rows if r["trend"] == "Red")
+    n = len(rows)
+    green_pct = round(100.0 * green_count / n, 2) if n else 0.0
+
+    dual_up = [r["symbol"] for r in rows if r["dual_cross_up"]]
+    dual_dn = [r["symbol"] for r in rows if r["dual_cross_down_filter"]]
+    above = [r["symbol"] for r in rows if r["above_upper"]]
+
+    payload = {
+        "tf": tf,
+        "ts": ts,
+        "dry_run": True,
+        "gc_params": {
+            "source": "hlc3",
+            "poles": GC_POLES,
+            "period": GC_PERIOD,
+            "mult": GC_MULT,
+            "reducedLag": GC_REDUCED_LAG,
+            "fastResponse": GC_FAST_RESPONSE,
+        },
+        "universe_source": universe_src,
+        "universe_requested": symbols,
+        "n_scanned": n,
+        "errors": errors,
+        "breadth": {
+            "green_count": green_count,
+            "red_count": red_count,
+            "green_pct": green_pct,
+            "n": n,
+        },
+        "flags": {
+            "dual_cross_up": dual_up,
+            "dual_cross_down_filter": dual_dn,
+            "above_upper": above,
+        },
+        "rows": rows,
+    }
+
+    os.makedirs(OUT_DIR, exist_ok=True)
+    stem = cfg["out_stem"]
+    json_path = os.path.join(OUT_DIR, f"{stem}.json")
+    csv_path = os.path.join(OUT_DIR, f"{stem}.csv")
+
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+    with open(csv_path, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore")
+        w.writeheader()
+        for r in rows:
+            w.writerow(r)
+
+    # Back-compat alias for 1d
+    alias = cfg.get("alias_stem")
+    if alias:
+        alias_json = os.path.join(OUT_DIR, f"{alias}.json")
+        alias_csv = os.path.join(OUT_DIR, f"{alias}.csv")
+        shutil.copy2(json_path, alias_json)
+        shutil.copy2(csv_path, alias_csv)
+        print(f"[done] alias {alias_json} / {alias_csv}")
+
+    elapsed = time.time() - t0
+    print(f"[done] wrote {json_path}")
+    print(f"[done] wrote {csv_path}")
+    print(f"[tf={tf}] breadth green={green_count} red={red_count} green_pct={green_pct}% n={n} "
+          f"dual_up={len(dual_up)} elapsed={elapsed:.1f}s")
+    print(f"[tf={tf}] dual_cross_up ({len(dual_up)}): {', '.join(dual_up) if dual_up else '(none)'}")
+
+    payload["_elapsed_s"] = elapsed
+    payload["_json_path"] = json_path
+    payload["_csv_path"] = csv_path
+    return payload
+
+
+def parse_tfs(arg: Optional[str]) -> List[str]:
+    if not arg or arg.strip().lower() in ("all", "*"):
+        return list(VALID_TFS)
+    parts = [p.strip().lower() for p in arg.split(",") if p.strip()]
+    # normalize aliases
+    norm_map = {"2H": "2h", "4H": "4h", "1D": "1d", "d": "1d", "2h": "2h", "4h": "4h", "1d": "1d"}
+    out: List[str] = []
+    for p in parts:
+        p2 = norm_map.get(p, norm_map.get(p.upper(), p))
+        if p2 not in VALID_TFS:
+            raise SystemExit(f"Unknown tf={p!r}; valid: {', '.join(VALID_TFS)}")
+        if p2 not in out:
+            out.append(p2)
+    # Prefer stable order: 2h, 4h, 1d
+    return [t for t in VALID_TFS if t in out]
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    ap = argparse.ArgumentParser(description="Own Trend Radar multi-TF GC scan (DRY_RUN)")
+    ap.add_argument(
+        "--tf",
+        default="all",
+        help="Timeframe(s): 2h|4h|1d or comma-list, or 'all' (default)",
+    )
+    ap.add_argument("--max", type=int, default=MAX_SYMBOLS, help=f"Max symbols (default {MAX_SYMBOLS})")
+    ap.add_argument("--concurrency", type=int, default=CONCURRENCY, help=f"Workers (default {CONCURRENCY})")
+    args = ap.parse_args(argv)
+
+    tfs = parse_tfs(args.tf)
+    max_n = max(1, int(args.max))
+    concurrency = max(1, min(8, int(args.concurrency)))
+
+    os.makedirs(OUT_DIR, exist_ok=True)
+    t_all = time.time()
+
+    symbols, universe_src = load_universe(max_n)
+    print(f"[info] universe={universe_src} n={len(symbols)} concurrency={concurrency}")
+    print(f"[info] TFs={','.join(tfs)}")
+    print(
+        f"[info] GC poles={GC_POLES} period={GC_PERIOD} mult={GC_MULT} "
+        f"lag={GC_REDUCED_LAG} fast={GC_FAST_RESPONSE}"
+    )
+
+    summaries: List[dict] = []
+    # Sequential TFs with shared concurrency pool per TF — avoids 150×3 hammering HL
+    for tf in tfs:
+        payload = scan_tf(tf, symbols, universe_src, concurrency=concurrency)
+        summaries.append(payload)
+
+    total = time.time() - t_all
+    print()
+    print("=" * 60)
+    print(f"[ALL DONE] TFs={','.join(tfs)} total_elapsed={total:.1f}s")
+    for p in summaries:
+        b = p.get("breadth") or {}
+        flags = p.get("flags") or {}
+        dual = flags.get("dual_cross_up") or []
+        print(
+            f"  {p.get('tf')}: n={b.get('n')} green_pct={b.get('green_pct')}% "
+            f"dual_cross_up={len(dual)} → {p.get('_json_path')}"
+        )
+    print("=" * 60)
+
+    # Fail if any TF scanned too few
+    bad = [p for p in summaries if (p.get("n_scanned") or 0) < 20]
+    if bad:
+        for p in bad:
+            print(f"[warn] tf={p.get('tf')} scanned only {p.get('n_scanned')} (<20)", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
