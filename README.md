@@ -16,6 +16,12 @@ math (Signum Strategy v3.3 params). Supports **1h / 4h / 1d**.
 
 Ported from `/workspace/signum-compat-gc/gc.ts`.
 
+## Universe & momentum
+
+See **[UNIVERSE.md](UNIVERSE.md)**: default ~280 liquid HL names (`dayNtlVlm ≥ $75k`, soft OI>0).
+Momentum columns (`rvol` / `vol_accel` / `mom_score`) are **observe/rank only** — GC `dual_cross_up` entry math is unchanged.
+Each row also gets **tier** (mcap Mega/Large/Small/Tiny) and **category** (Narrative/Cemetery/Price). `$75k` floor = HL `dayNtlVlm` (24h notional volume USD). See [UNIVERSE.md](UNIVERSE.md) / [RAILWAY_CRON.md](RAILWAY_CRON.md) (1h+4h every 15m).
+
 ## Run scan
 
 ```bash

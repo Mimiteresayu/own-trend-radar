@@ -26,6 +26,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
@@ -63,6 +64,117 @@ HL_VOLUME_JSON = _resolve_data_file(
     "hl_volume_top100.json",
     "/workspace/hl_volume_top100.json",
 )
+
+# Size tier (mcap) + category sleeves
+try:
+    from mcap_tiers import load_mcap_map, tier_from_mcap, mcap_usd as _mcap_usd_lookup
+except ImportError:  # pragma: no cover
+    load_mcap_map = None  # type: ignore
+    tier_from_mcap = None  # type: ignore
+    _mcap_usd_lookup = None  # type: ignore
+
+CEMETERY_DROP_ATH_PCT = 70.0
+NARRATIVE_PATHS = (
+    "narrative/watchlist.json",
+    "out/narrative_watchlist.json",
+    "data/narrative_watchlist.json",
+)
+
+
+def _norm_sym(s: str) -> str:
+    return str(s or "").strip().upper().lstrip("$")
+
+
+def _sym_aliases(sym: str) -> set:
+    """Match keys: symbol + stripped k-prefix (kPEPE→PEPE). Does not invent k-forms."""
+    s = _norm_sym(sym)
+    out = {s}
+    if s.startswith("K") and len(s) > 2 and s[1:].isalnum():
+        out.add(s[1:])
+    return out
+
+
+def load_narrative_tickers() -> set:
+    """Union of tickers from narrative watchlist JSON files (graceful if missing)."""
+    tickers: set = set()
+    for rel in NARRATIVE_PATHS:
+        path = rel if os.path.isabs(rel) else os.path.join(ROOT, rel)
+        if not os.path.isfile(path):
+            continue
+        try:
+            raw = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        items = []
+        if isinstance(raw, dict):
+            items = raw.get("items") or raw.get("watchlist") or raw.get("symbols") or []
+        elif isinstance(raw, list):
+            items = raw
+        for it in items:
+            if isinstance(it, str):
+                t = it
+            elif isinstance(it, dict):
+                t = it.get("ticker") or it.get("symbol") or it.get("coin") or ""
+            else:
+                continue
+            t = _norm_sym(t)
+            if not t:
+                continue
+            tickers.add(t)
+            # bare form so HL kPEPE matches watchlist PEPE
+            if t.startswith("K") and len(t) > 2:
+                tickers.add(t[1:])
+    return tickers
+
+
+def classify_category(symbol: str, drop_from_ath_pct, narrative_set: set) -> tuple:
+    """Primary category + optional multi-label list. Priority: Narrative > Cemetery > Price."""
+    syms = _sym_aliases(symbol)
+    is_narr = bool(syms & narrative_set)
+    try:
+        drop = float(drop_from_ath_pct) if drop_from_ath_pct is not None else None
+    except (TypeError, ValueError):
+        drop = None
+    is_cem = drop is not None and drop >= CEMETERY_DROP_ATH_PCT
+    cats = []
+    if is_narr:
+        cats.append("Narrative")
+    if is_cem:
+        cats.append("Cemetery")
+    if not cats:
+        cats.append("Price")
+    primary = "Narrative" if is_narr else ("Cemetery" if is_cem else "Price")
+    return primary, cats
+
+
+def enrich_row_tier_category(row: dict, narrative_set: set, mcap_map: dict | None = None) -> None:
+    """Attach tier / mcap_usd / mcap_known / category / categories in-place."""
+    sym = row.get("symbol") or ""
+    usd = None
+    if mcap_map is not None:
+        for a in _sym_aliases(sym):
+            if a in mcap_map:
+                usd = mcap_map[a]
+                break
+    elif _mcap_usd_lookup is not None:
+        usd = _mcap_usd_lookup(sym)
+        if usd is None:
+            # try stripped k-prefix
+            for a in _sym_aliases(sym):
+                usd = _mcap_usd_lookup(a)
+                if usd is not None:
+                    break
+    if tier_from_mcap is not None:
+        tier = tier_from_mcap(usd)
+    else:
+        tier = "tiny"
+    row["tier"] = tier
+    row["mcap_usd"] = round(float(usd), 2) if usd is not None else None
+    row["mcap_known"] = usd is not None
+    primary, cats = classify_category(sym, row.get("drop_from_ath_pct"), narrative_set)
+    row["category"] = primary
+    row["categories"] = cats
+
 
 MAX_SYMBOLS = 280  # expanded liquid HL universe (~250–300; --max overrides)
 # Universe liquidity floor: dayNtlVlm >= $75k (between $50k–$100k).
@@ -648,6 +760,10 @@ CSV_FIELDS = [
     "vol_change_pct",
     "mom_score",
     "mom_rank",
+    "tier",
+    "mcap_usd",
+    "mcap_known",
+    "category",
 ]
 
 

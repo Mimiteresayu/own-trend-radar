@@ -1,0 +1,311 @@
+{
+  "sot": "accumulative; HL full-auto majors; Bitunix semi-auto for narrative when listed; GC same params; no 3-day auto-fade",
+  "updated": "2026-09-20T14:29+08:00",
+  "items": [
+    {
+      "ticker": "WORM",
+      "sector": "agent",
+      "asset_type": "crypto",
+      "narrative": "Agent Wormhole AI-agent security / burn",
+      "venue": "unknown",
+      "gc_scan": false,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-19",
+      "notes": " | not on Bitunix futures (checked 2026-09-19)"
+    },
+    {
+      "ticker": "ALLINU",
+      "sector": "meme",
+      "asset_type": "crypto",
+      "narrative": "Casino/sports-betting Inu paired with DKNG; rewards sustainability unverified",
+      "venue": "unknown",
+      "gc_scan": false,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-20",
+      "notes": "not on Bitunix futures (checked 2026-09-19) | Grok 2026-09-20 refresh"
+    },
+    {
+      "ticker": "DKNG",
+      "sector": "tokenized-equity",
+      "asset_type": "tokenized-stock",
+      "narrative": "Sports-betting equity quote paired with ALLINU",
+      "venue": "Bitunix",
+      "gc_scan": true,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-20",
+      "bitunix_symbol": "DKNGUSDT",
+      "notes": "Bitunix perp; Helm semi-auto | Grok 2026-09-20 refresh"
+    },
+    {
+      "ticker": "PLTR",
+      "sector": "tokenized-equity",
+      "asset_type": "tokenized-stock",
+      "narrative": "Palantir-linked pair / Robinhood Chain backdrop for WORM",
+      "venue": "Bitunix",
+      "gc_scan": true,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-19",
+      "bitunix_symbol": "PLTRUSDT",
+      "notes": " | Bitunix perp; Helm semi-auto"
+    },
+    {
+      "ticker": "VAR",
+      "sector": "points-preTGE",
+      "asset_type": "points",
+      "narrative": "Variational Omni points → expected token; TGE unknown",
+      "venue": "n/a",
+      "gc_scan": false,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-19",
+      "notes": " | not on Bitunix futures (checked 2026-09-19)"
+    },
+    {
+      "ticker": "BONK",
+      "sector": "meme",
+      "asset_type": "crypto",
+      "narrative": "Mature SOL meme beta if SOL breaks highs",
+      "venue": "Bitunix",
+      "gc_scan": true,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-19",
+      "bitunix_symbol": "1000BONKUSDT",
+      "notes": " | Bitunix perp; Helm semi-auto"
+    },
+    {
+      "ticker": "PEPE",
+      "sector": "meme",
+      "asset_type": "crypto",
+      "narrative": "Mentioned as rotation-out vs LAMBO; mature meme beta",
+      "venue": "Bitunix",
+      "gc_scan": true,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-20",
+      "bitunix_symbol": "1000PEPEUSDT",
+      "notes": "Bitunix perp; Helm semi-auto | Grok 2026-09-20 refresh; Bitunix perp"
+    },
+    {
+      "ticker": "BTC",
+      "sector": "major",
+      "asset_type": "crypto",
+      "narrative": "Macro + Renzo Basis spot leg",
+      "venue": "HL",
+      "gc_scan": true,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-19"
+    },
+    {
+      "ticker": "ETH",
+      "sector": "major",
+      "asset_type": "crypto",
+      "narrative": "Meme supercycle trigger (break prior highs)",
+      "venue": "HL",
+      "gc_scan": true,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-19"
+    },
+    {
+      "ticker": "SOL",
+      "sector": "major",
+      "asset_type": "crypto",
+      "narrative": "SOL meme / BONK trigger",
+      "venue": "HL",
+      "gc_scan": true,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-19"
+    },
+    {
+      "ticker": "HYPE",
+      "sector": "major",
+      "asset_type": "crypto",
+      "narrative": "HL ecosystem + Renzo Basis",
+      "venue": "HL",
+      "gc_scan": true,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-19"
+    },
+    {
+      "ticker": "Quotrons",
+      "sector": "chain-ecosystem",
+      "asset_type": "ecosystem",
+      "narrative": "Robinhood Chain ERC-404 / QuoPull rewards",
+      "venue": "unknown",
+      "gc_scan": false,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-19"
+    },
+    {
+      "ticker": "StonkFun",
+      "sector": "launchpad",
+      "asset_type": "ecosystem",
+      "narrative": "Dominant narrative: tokenized assets + meme rewards; 7d revenue −38–39%; Mindshare S1 ends ~2026-09-21",
+      "venue": "Solana",
+      "gc_scan": false,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-20",
+      "notes": "Grok 2026-09-20 focus"
+    },
+    {
+      "ticker": "Renzo Basis",
+      "sector": "DeFi-product",
+      "asset_type": "product",
+      "narrative": "Self-custodial basis (spot+short perp)",
+      "venue": "n/a",
+      "gc_scan": false,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-19"
+    },
+    {
+      "ticker": "Variational",
+      "sector": "RWA",
+      "asset_type": "ecosystem",
+      "narrative": "On-chain perp/RWA/pre-IPO; Omni points ~Sep 30",
+      "venue": "n/a",
+      "gc_scan": false,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-19"
+    },
+    {
+      "ticker": "Robinhood Chain",
+      "sector": "chain-ecosystem",
+      "asset_type": "ecosystem",
+      "narrative": "Backdrop for WORM/StonkFun/tokenized stocks",
+      "venue": "n/a",
+      "gc_scan": false,
+      "first_seen": "2026-09-19",
+      "last_seen": "2026-09-19"
+    },
+    {
+      "ticker": "STONK",
+      "sector": "launchpad",
+      "asset_type": "crypto",
+      "narrative": "StonkFun platform token paired with SPYx; reward tax + buyback/burn; retention test after revenue drop",
+      "venue": "unknown",
+      "gc_scan": false,
+      "notes": "Grok 2026-09-20; aka StonkFun native",
+      "first_seen": "2026-09-20",
+      "last_seen": "2026-09-20"
+    },
+    {
+      "ticker": "KNOTS",
+      "sector": "meme",
+      "asset_type": "crypto",
+      "narrative": "Reverse-STONK satellite; 3% tax distributes STONK; reported $2.4–2.9M payouts; rated 7.5/10",
+      "venue": "unknown",
+      "gc_scan": false,
+      "notes": "Grok 2026-09-20 primary research candidate",
+      "first_seen": "2026-09-20",
+      "last_seen": "2026-09-20"
+    },
+    {
+      "ticker": "GP",
+      "sector": "meme",
+      "asset_type": "crypto",
+      "narrative": "Gold Pieces / RuneScape meme paired with GLDx; 3% tax gold rewards; rated 6.5/10 volume-dependent",
+      "venue": "unknown",
+      "gc_scan": false,
+      "notes": "Grok 2026-09-20",
+      "first_seen": "2026-09-20",
+      "last_seen": "2026-09-20"
+    },
+    {
+      "ticker": "ZCAT",
+      "sector": "meme",
+      "asset_type": "crypto",
+      "narrative": "StonkFun key project; thesis/metrics thin in report",
+      "venue": "unknown",
+      "gc_scan": false,
+      "notes": "Grok 2026-09-20",
+      "first_seen": "2026-09-20",
+      "last_seen": "2026-09-20"
+    },
+    {
+      "ticker": "WOW",
+      "sector": "meme",
+      "asset_type": "crypto",
+      "narrative": "Gaming/meme competing with GP for attention; needs mcap/volume verify",
+      "venue": "unknown",
+      "gc_scan": false,
+      "notes": "Grok 2026-09-20",
+      "first_seen": "2026-09-20",
+      "last_seen": "2026-09-20"
+    },
+    {
+      "ticker": "SPX6900",
+      "sector": "meme",
+      "asset_type": "crypto",
+      "narrative": "Murad diamond-hand long-term conviction meme; ~$456M mcap cited",
+      "venue": "unknown",
+      "gc_scan": false,
+      "notes": "Grok 2026-09-20",
+      "first_seen": "2026-09-20",
+      "last_seen": "2026-09-20"
+    },
+    {
+      "ticker": "LAMBO",
+      "sector": "meme",
+      "asset_type": "crypto",
+      "narrative": "Auto-trader / sell-PEPE-buy-LAMBO narrative; market data incomplete",
+      "venue": "unknown",
+      "gc_scan": false,
+      "notes": "Grok 2026-09-20",
+      "first_seen": "2026-09-20",
+      "last_seen": "2026-09-20"
+    },
+    {
+      "ticker": "SPYx",
+      "sector": "tokenized-equity",
+      "asset_type": "tokenized-stock",
+      "narrative": "Tokenized SPY quote asset paired with STONK on StonkFun",
+      "venue": "unknown",
+      "gc_scan": false,
+      "notes": "Grok 2026-09-20",
+      "first_seen": "2026-09-20",
+      "last_seen": "2026-09-20"
+    },
+    {
+      "ticker": "GLDx",
+      "sector": "RWA",
+      "asset_type": "tokenized-stock",
+      "narrative": "Tokenized gold quote paired with GP rewards",
+      "venue": "unknown",
+      "gc_scan": false,
+      "notes": "Grok 2026-09-20",
+      "first_seen": "2026-09-20",
+      "last_seen": "2026-09-20"
+    },
+    {
+      "ticker": "GNOME",
+      "sector": "chain-ecosystem",
+      "asset_type": "ecosystem",
+      "narrative": "Possible GP-related StonkFun extension; unvalidated",
+      "venue": "n/a",
+      "gc_scan": false,
+      "notes": "Grok 2026-09-20",
+      "first_seen": "2026-09-20",
+      "last_seen": "2026-09-20"
+    },
+    {
+      "ticker": "PLAT",
+      "sector": "chain-ecosystem",
+      "asset_type": "ecosystem",
+      "narrative": "Possible StonkFun capital-flow extension; unvalidated",
+      "venue": "n/a",
+      "gc_scan": false,
+      "notes": "Grok 2026-09-20",
+      "first_seen": "2026-09-20",
+      "last_seen": "2026-09-20"
+    }
+  ],
+  "bitunix_map": {
+    "DKNG": "DKNGUSDT",
+    "PLTR": "PLTRUSDT",
+    "BONK": "1000BONKUSDT",
+    "PEPE": "1000PEPEUSDT"
+  },
+  "source_report": {
+    "date": "2026-09-20",
+    "url": "https://grok.com/chat/038bcd5f-4913-4c6c-a1d0-2e0f6fde6804",
+    "gmail_subject": "StonkFun retention test begins",
+    "cutoff_hkt": "2026-09-20 08:38"
+  }
+}

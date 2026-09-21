@@ -37,8 +37,10 @@ SCHEDULER_ENABLE = (os.environ.get("OTR_SCHEDULER") or ("1" if ON_RAILWAY else "
 SCAN_MAX = int(os.environ.get("OTR_SCAN_MAX") or "280")
 SCAN_MAX_1H = int(os.environ.get("OTR_SCAN_MAX_1H") or "200")
 SCAN_CONCURRENCY = int(os.environ.get("OTR_SCAN_CONCURRENCY") or "2")
+# Radar refresh interval for 1h+4h (minutes). Default 15 for 1H exits.
+SCAN_INTERVAL_MIN = max(5, int(os.environ.get("OTR_SCAN_INTERVAL_MIN") or "15"))
 _scan_lock = threading.Lock()
-_last_scan: dict[str, str] = {}  # tf -> "YYYY-MM-DDTHH:MM" UTC slot key
+_last_scan: dict[str, str] = {}  # tf -> slot key
 
 LOGIN_HTML = """<!doctype html><html><head><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\">
 <title>Own Trend Radar</title>
@@ -101,33 +103,35 @@ def _slot_key(now: datetime, kind: str) -> str:
     """Dedup key so each schedule window runs once."""
     if kind == "1d":
         return now.strftime("%Y-%m-%d") + ":1d"
-    if kind == "4h":
-        # bar closes at 00/04/08/12/16/20; slot at :05
-        hour = (now.hour // 4) * 4
-        return now.strftime("%Y-%m-%d") + f":4h:{hour:02d}"
-    # 1h
-    return now.strftime("%Y-%m-%dT%H") + ":1h"
+    # 1h / 4h share the same 15-minute radar slot (floor minute)
+    slot_min = (now.minute // SCAN_INTERVAL_MIN) * SCAN_INTERVAL_MIN
+    return now.strftime("%Y-%m-%dT%H") + f":{slot_min:02d}:{kind}"
 
 
 def _due_tfs(now: datetime) -> list[tuple[str, int]]:
-    """Return list of (tf, max_symbols) due at this UTC minute (only at :05)."""
-    if now.minute != 5:
-        return []
+    """Return (tf, max_symbols) due now.
+
+    - 1h + 4h every SCAN_INTERVAL_MIN minutes (default 15 → :00/:15/:30/:45)
+    - 1d daily at 00:05 UTC only (daily bars; not on 15m tick)
+    """
     due: list[tuple[str, int]] = []
-    # 1H every hour at :05
-    if _last_scan.get("1h") != _slot_key(now, "1h"):
-        due.append(("1h", SCAN_MAX_1H))
-    # 4H at 00/04/08/12/16/20 :05
-    if now.hour % 4 == 0 and _last_scan.get("4h") != _slot_key(now, "4h"):
-        due.append(("4h", SCAN_MAX))
+    # Intraday radar (exits): every N minutes on the clock
+    if now.minute % SCAN_INTERVAL_MIN == 0:
+        if _last_scan.get("1h") != _slot_key(now, "1h"):
+            due.append(("1h", SCAN_MAX_1H))
+        if _last_scan.get("4h") != _slot_key(now, "4h"):
+            due.append(("4h", SCAN_MAX))
     # 1D daily at 00:05 UTC (= 08:05 HKT)
-    if now.hour == 0 and _last_scan.get("1d") != _slot_key(now, "1d"):
+    if now.hour == 0 and now.minute == 5 and _last_scan.get("1d") != _slot_key(now, "1d"):
         due.append(("1d", SCAN_MAX))
     return due
 
 
 def _scheduler_loop() -> None:
-    sys.stderr.write("[scheduler] started UTC schedules: 1d@00:05 4h@*/4:05 1h@*:05\n")
+    sys.stderr.write(
+        f"[scheduler] started UTC: 1h+4h every {SCAN_INTERVAL_MIN}m; 1d@00:05 "
+        f"(concurrency={SCAN_CONCURRENCY})\n"
+    )
     # Soft boot: if radar files missing, scan after short delay (volume may be empty)
     time.sleep(15)
     missing = [
@@ -138,7 +142,6 @@ def _scheduler_loop() -> None:
     if missing and _scan_lock.acquire(blocking=False):
         try:
             sys.stderr.write(f"[scheduler] boot scan missing={missing}\n")
-            # Prefer heavier TFs first; 1h uses lighter max
             for tf in missing:
                 mx = SCAN_MAX_1H if tf == "1h" else SCAN_MAX
                 ok, note = _run_scan([tf], max_symbols=mx)
@@ -154,23 +157,28 @@ def _scheduler_loop() -> None:
             due = _due_tfs(now)
             if due and _scan_lock.acquire(blocking=False):
                 try:
-                    # Mark slots first so we don't hammer if scan is slow past the minute
+                    # Mark slots first so we don't re-fire if scan spans the next minute tick
                     for tf, _mx in due:
                         _last_scan[tf] = _slot_key(now, tf)
-                    # Group: run 4h+1d together when both due; 1h alone or with them
-                    heavy = [tf for tf, _ in due if tf in ("1d", "4h")]
-                    light = [tf for tf, _ in due if tf == "1h"]
-                    if heavy:
-                        ok, note = _run_scan(heavy, max_symbols=SCAN_MAX)
-                        sys.stderr.write(f"[scheduler] {now.isoformat()} heavy={heavy} ok={ok} {note[:300]}\n")
-                    if light:
-                        ok, note = _run_scan(light, max_symbols=SCAN_MAX_1H)
-                        sys.stderr.write(f"[scheduler] {now.isoformat()} 1h ok={ok} {note[:300]}\n")
+                    # 1d alone when due; 1h+4h together on the 15m tick (4h uses SCAN_MAX)
+                    daily = [tf for tf, _ in due if tf == "1d"]
+                    intraday = [tf for tf, _ in due if tf in ("1h", "4h")]
+                    if daily:
+                        ok, note = _run_scan(daily, max_symbols=SCAN_MAX)
+                        sys.stderr.write(f"[scheduler] {now.isoformat()} 1d ok={ok} {note[:300]}\n")
+                    if intraday:
+                        # Prefer scanning 4h then 1h sequentially via one or two calls
+                        if "4h" in intraday:
+                            ok, note = _run_scan(["4h"], max_symbols=SCAN_MAX)
+                            sys.stderr.write(f"[scheduler] {now.isoformat()} 4h ok={ok} {note[:300]}\n")
+                        if "1h" in intraday:
+                            ok, note = _run_scan(["1h"], max_symbols=SCAN_MAX_1H)
+                            sys.stderr.write(f"[scheduler] {now.isoformat()} 1h ok={ok} {note[:300]}\n")
                 finally:
                     _scan_lock.release()
         except Exception as e:
             sys.stderr.write(f"[scheduler] error: {e}\n")
-        time.sleep(20)
+        time.sleep(15)
 
 
 class Handler(SimpleHTTPRequestHandler):

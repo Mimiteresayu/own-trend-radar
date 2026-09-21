@@ -417,6 +417,13 @@
     font-size: 0.8rem;
   }
 
+
+  .tier-mega, .tier-large { color: #d4b96a; }
+  .tier-small, .tier-tiny { color: #8b9bab; }
+  .cat-Narrative { color: #c9a0ff; }
+  .cat-Cemetery { color: #e3a857; }
+  .cat-Price { color: var(--muted); }
+
   /* ——— Radar / shared table styles ——— */
   .tf-tabs, .filters {
     display: flex;
@@ -753,6 +760,8 @@
         <thead>
           <tr>
             <th data-k="symbol">symbol <span class="arrow">↕</span></th>
+            <th data-k="tier">tier <span class="arrow">↕</span></th>
+            <th data-k="category">category <span class="arrow">↕</span></th>
             <th data-k="trend">trend <span class="arrow">↕</span></th>
             <th data-k="close">close <span class="arrow">↕</span></th>
             <th data-k="filter">filter <span class="arrow">↕</span></th>
@@ -1262,8 +1271,12 @@
       if (r.dual_cross_up) cls = "hl-up";
       else if (r.dual_cross_down_filter) cls = "hl-down";
       const trendCls = r.trend === "Green" ? "trend-g" : "trend-r";
+      const tier = (r.tier || "tiny").toLowerCase();
+      const cat = r.category || "Price";
       return `<tr class="${cls}">
         <td>${r.symbol}</td>
+        <td class="tier-${tier}">${tier}</td>
+        <td class="cat-${cat}">${cat}</td>
         <td class="${trendCls}">${r.trend}</td>
         <td>${fmtNum(r.close)}</td>
         <td>${fmtNum(r.filter)}</td>
