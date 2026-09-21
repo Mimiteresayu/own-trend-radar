@@ -1,0 +1,208 @@
+{
+  "ts": "2026-09-21T00:55:30.094498+00:00",
+  "address": "0xcFCd\u2026B122",
+  "accountValue": "340.713593",
+  "sot": "1D entry / 4H upper-loss long exit; 1D Filter stop short; GC lag+fast OFF",
+  "gc": "hlc3/4/144/1.414 lag=0 fast=0",
+  "positions": [
+    {
+      "symbol": "BTC",
+      "side": "LONG",
+      "size": 0.00142,
+      "entry": 80529.0,
+      "unrealizedPnl": 1.718768,
+      "positionValue": 116.069948,
+      "exits": {
+        "4h": {
+          "ok": true,
+          "tf": "4h",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "close": 81221.0,
+          "upper": 78700.45235823,
+          "filter": 77491.5319185,
+          "armed": true,
+          "signal": null,
+          "roe_px": 0.859
+        }
+      },
+      "signal": null
+    },
+    {
+      "symbol": "ETH",
+      "side": "LONG",
+      "size": 0.0443,
+      "entry": 2577.0,
+      "unrealizedPnl": 5.2717,
+      "positionValue": 119.4328,
+      "exits": {
+        "4h": {
+          "ok": true,
+          "tf": "4h",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "close": 2646.2,
+          "upper": 2539.4801163,
+          "filter": 2483.56159911,
+          "armed": true,
+          "signal": null,
+          "roe_px": 2.685
+        }
+      },
+      "signal": null
+    },
+    {
+      "symbol": "SOL",
+      "side": "LONG",
+      "size": 1.04,
+      "entry": 108.95,
+      "unrealizedPnl": 3.7232,
+      "positionValue": 117.0312,
+      "exits": {
+        "4h": {
+          "ok": true,
+          "tf": "4h",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "close": 111.19,
+          "upper": 104.29473791,
+          "filter": 101.70592324,
+          "armed": true,
+          "signal": null,
+          "roe_px": 2.056
+        }
+      },
+      "signal": null
+    },
+    {
+      "symbol": "TRX",
+      "side": "LONG",
+      "size": 336.0,
+      "entry": 0.3403,
+      "unrealizedPnl": 0.9744,
+      "positionValue": 115.3152,
+      "exits": {
+        "4h": {
+          "ok": true,
+          "tf": "4h",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "close": 0.34273,
+          "upper": 0.33967758,
+          "filter": 0.3372552,
+          "armed": true,
+          "signal": null,
+          "roe_px": 0.714
+        }
+      },
+      "signal": null
+    },
+    {
+      "symbol": "BRETT",
+      "side": "LONG",
+      "size": 21623.0,
+      "entry": 0.005294,
+      "unrealizedPnl": 2.783979,
+      "positionValue": 117.261529,
+      "exits": {
+        "4h": {
+          "ok": true,
+          "tf": "4h",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "close": 0.005334,
+          "upper": 0.00511054,
+          "filter": 0.00490456,
+          "armed": true,
+          "signal": null,
+          "roe_px": 0.756
+        }
+      },
+      "signal": null
+    },
+    {
+      "symbol": "HYPE",
+      "side": "LONG",
+      "size": 1.25,
+      "entry": 91.104,
+      "unrealizedPnl": 3.995,
+      "positionValue": 117.875,
+      "exits": {
+        "4h": {
+          "ok": true,
+          "tf": "4h",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "close": 93.749,
+          "upper": 84.14308537,
+          "filter": 81.43846574,
+          "armed": true,
+          "signal": null,
+          "roe_px": 2.903
+        }
+      },
+      "signal": null
+    },
+    {
+      "symbol": "NIL",
+      "side": "LONG",
+      "size": 2279.0,
+      "entry": 0.050174,
+      "unrealizedPnl": 30.973743,
+      "positionValue": 145.320435,
+      "exits": {
+        "4h": {
+          "ok": true,
+          "tf": "4h",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "close": 0.061815,
+          "upper": 0.04452764,
+          "filter": 0.04285469,
+          "armed": true,
+          "signal": null,
+          "roe_px": 23.201
+        }
+      },
+      "signal": null
+    },
+    {
+      "symbol": "AVNT",
+      "side": "LONG",
+      "size": 1006.0,
+      "entry": 0.110311,
+      "unrealizedPnl": 0.36112,
+      "positionValue": 111.33402,
+      "exits": {
+        "4h": {
+          "ok": true,
+          "tf": "4h",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "close": 0.11024,
+          "upper": 0.10342465,
+          "filter": 0.09988552,
+          "armed": true,
+          "signal": null,
+          "roe_px": -0.064
+        }
+      },
+      "signal": null
+    },
+    {
+      "symbol": "ZEC",
+      "side": "LONG",
+      "size": 0.07,
+      "entry": 1449.1,
+      "unrealizedPnl": 6.727,
+      "positionValue": 108.164,
+      "exits": {
+        "4h": {
+          "ok": true,
+          "tf": "4h",
+          "bar_utc": "2026-09-20T20:00:00+00:00",
+          "close": 1510.9,
+          "upper": 1307.66668574,
+          "filter": 1230.49046476,
+          "armed": true,
+          "signal": null,
+          "roe_px": 4.265
+        }
+      },
+      "signal": null
+    }
+  ],
+  "dry_run": true
+}

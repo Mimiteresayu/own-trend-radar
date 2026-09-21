@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.log
+*.bak
+*.bak.*
+ui_snapshot.html
+out/charts/
+out/*.log
+.railway_password
+.railway_ids.json
+railway_function.ts

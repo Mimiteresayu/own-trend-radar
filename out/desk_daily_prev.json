@@ -1,0 +1,699 @@
+{
+  "ts": "2026-09-21T00:30:46.673687+00:00",
+  "ts_hkt": "2026-09-21 08:30 HKT",
+  "routine": "Harbor 4H auto exit+desk LIVE",
+  "sot": {
+    "entry_own_narrative": "1D Upper dual_cross_up only",
+    "entry_majors": "1D Filter dual_cross_up AND Green (NOT Green+Above Upper chase)",
+    "topup": "above Upper + ROE\u226510% + undersized vs ~8%",
+    "sl": "4H Filter",
+    "tp": "H4 Upper-loss after armed",
+    "size_pct": 8,
+    "leverage": "1\u20135 by confluence layers",
+    "gc": "hlc3/4/144/1.414 Lag OFF Fast OFF",
+    "open_positions": "may hold even if wouldn't qualify as NEW majors entries"
+  },
+  "freshness": {
+    "1d_ts": null,
+    "1d_age_h": null,
+    "1d_ok": false,
+    "1d_note": "gc_radar_1d.json missing on box this run; entries skipped (4H desk)",
+    "4h_ts": "2026-09-21T00:28:18.673518+00:00",
+    "4h_age_h": 0.041,
+    "4h_ok": true,
+    "4h_source": "monitor_hl_exit + universe scan_gc_radar --tf 4h",
+    "n_1d": 140,
+    "breadth_1d": {
+      "green_count": 121,
+      "red_count": 19,
+      "green_pct": 86.43,
+      "n": 140
+    },
+    "breadth_4h": {
+      "green_count": 124,
+      "red_count": 20,
+      "green_pct": 86.11,
+      "n": 144
+    },
+    "dual_cross_up_1d": [
+      "AVNT",
+      "BRETT",
+      "MANTA",
+      "NIL",
+      "TRX"
+    ],
+    "checked_at_hkt": "2026-09-21 08:30 HKT",
+    "4h_rescanned": true,
+    "4h_bar_utc": "2026-09-20T20:00:00+00:00",
+    "4h_universe_ts": "2026-09-21T00:28:18.673518+00:00",
+    "n_4h": 144,
+    "universe_4h_ok": true,
+    "dual_cross_up_4h": [
+      "CRV"
+    ]
+  },
+  "breadth": {
+    "green_count": 121,
+    "red_count": 19,
+    "green_pct": 86.43,
+    "n": 140
+  },
+  "account": {
+    "address_short": "0xcFCd\u2026B122",
+    "mode": "Unified",
+    "perp_nav": 341.407879,
+    "spot_usdc": 535.460306,
+    "spot_usdc_hold": 341.230389,
+    "spot_usdc_free": 194.22991699999994,
+    "total_eq": 535.460306,
+    "margin_used": 341.230389,
+    "withdrawable": 0.17749,
+    "uPnl_sum": 57.223196,
+    "total_ntl_pos": 1068.498418
+  },
+  "positions": [
+    {
+      "coin": "BTC",
+      "side": "LONG",
+      "size": 0.00142,
+      "entry": 80529.0,
+      "mid": 81743.5,
+      "positionValue": 116.08642,
+      "uPnl": 1.73524,
+      "uPnl_pct_entry": 1.5081523426343306,
+      "leverage": 3,
+      "liq": null,
+      "marginUsed": 38.695473,
+      "armed": true,
+      "h4_close": 81221.0,
+      "h4_upper": 78700.45235823,
+      "h4_filter": 77491.5319185,
+      "exit_signal": null,
+      "action": "HOLD",
+      "roe_px": 0.859,
+      "bar_utc": "2026-09-20T20:00:00+00:00"
+    },
+    {
+      "coin": "ETH",
+      "side": "LONG",
+      "size": 0.0443,
+      "entry": 2577.0,
+      "mid": 2687.05,
+      "positionValue": 119.01638,
+      "uPnl": 4.85528,
+      "uPnl_pct_entry": 4.270469538222747,
+      "leverage": 3,
+      "liq": null,
+      "marginUsed": 39.672126,
+      "armed": true,
+      "h4_close": 2646.2,
+      "h4_upper": 2539.4801163,
+      "h4_filter": 2483.56159911,
+      "exit_signal": null,
+      "action": "HOLD",
+      "roe_px": 2.685,
+      "bar_utc": "2026-09-20T20:00:00+00:00"
+    },
+    {
+      "coin": "SOL",
+      "side": "LONG",
+      "size": 1.04,
+      "entry": 108.95,
+      "mid": 112.345,
+      "positionValue": 116.8544,
+      "uPnl": 3.5464,
+      "uPnl_pct_entry": 3.1161083065626394,
+      "leverage": 3,
+      "liq": null,
+      "marginUsed": 38.951466,
+      "armed": true,
+      "h4_close": 111.19,
+      "h4_upper": 104.29473791,
+      "h4_filter": 101.70592324,
+      "exit_signal": null,
+      "action": "HOLD",
+      "roe_px": 2.056,
+      "bar_utc": "2026-09-20T20:00:00+00:00"
+    },
+    {
+      "coin": "TRX",
+      "side": "LONG",
+      "size": 336.0,
+      "entry": 0.3403,
+      "mid": 0.343855,
+      "positionValue": 115.53024,
+      "uPnl": 1.18944,
+      "uPnl_pct_entry": 1.0446664707611022,
+      "leverage": 3,
+      "liq": null,
+      "marginUsed": 38.51008,
+      "armed": true,
+      "h4_close": 0.34273,
+      "h4_upper": 0.33967758,
+      "h4_filter": 0.3372552,
+      "exit_signal": null,
+      "action": "HOLD",
+      "roe_px": 0.714,
+      "bar_utc": "2026-09-20T20:00:00+00:00"
+    },
+    {
+      "coin": "BRETT",
+      "side": "LONG",
+      "size": 21623.0,
+      "entry": 0.005294,
+      "mid": 0.005436,
+      "positionValue": 117.521005,
+      "uPnl": 3.043455,
+      "uPnl_pct_entry": 2.6822818284850727,
+      "leverage": 3,
+      "liq": null,
+      "marginUsed": 39.173668,
+      "armed": true,
+      "h4_close": 0.005334,
+      "h4_upper": 0.00511054,
+      "h4_filter": 0.00490456,
+      "exit_signal": null,
+      "action": "HOLD",
+      "roe_px": 0.756,
+      "bar_utc": "2026-09-20T20:00:00+00:00"
+    },
+    {
+      "coin": "HYPE",
+      "side": "LONG",
+      "size": 1.25,
+      "entry": 91.104,
+      "mid": 94.2095,
+      "positionValue": 117.75125,
+      "uPnl": 3.87125,
+      "uPnl_pct_entry": 3.4087416578855008,
+      "leverage": 3,
+      "liq": null,
+      "marginUsed": 39.250416,
+      "armed": true,
+      "h4_close": 93.749,
+      "h4_upper": 84.14308537,
+      "h4_filter": 81.43846574,
+      "exit_signal": null,
+      "action": "HOLD",
+      "roe_px": 2.903,
+      "bar_utc": "2026-09-20T20:00:00+00:00"
+    },
+    {
+      "coin": "NIL",
+      "side": "LONG",
+      "size": 2279.0,
+      "entry": 0.050174,
+      "mid": 0.064109,
+      "positionValue": 146.090737,
+      "uPnl": 31.744045,
+      "uPnl_pct_entry": 27.773348746362647,
+      "leverage": 3,
+      "liq": null,
+      "marginUsed": 48.696912,
+      "armed": true,
+      "h4_close": 0.061815,
+      "h4_upper": 0.04452764,
+      "h4_filter": 0.04285469,
+      "exit_signal": null,
+      "action": "HOLD",
+      "roe_px": 23.201,
+      "bar_utc": "2026-09-20T20:00:00+00:00"
+    },
+    {
+      "coin": "AVNT",
+      "side": "LONG",
+      "size": 1006.0,
+      "entry": 0.110311,
+      "mid": 0.111335,
+      "positionValue": 112.0181,
+      "uPnl": 1.0452,
+      "uPnl_pct_entry": 0.9282845772407077,
+      "leverage": 5,
+      "liq": null,
+      "marginUsed": 22.40362,
+      "armed": true,
+      "h4_close": 0.11024,
+      "h4_upper": 0.10342465,
+      "h4_filter": 0.09988552,
+      "exit_signal": null,
+      "action": "HOLD",
+      "roe_px": -0.064,
+      "bar_utc": "2026-09-20T20:00:00+00:00"
+    },
+    {
+      "coin": "ZEC",
+      "side": "LONG",
+      "size": 0.07,
+      "entry": 1449.1,
+      "mid": 1537.35,
+      "positionValue": 107.629886,
+      "uPnl": 6.192886,
+      "uPnl_pct_entry": 6.089986888413498,
+      "leverage": 3,
+      "liq": null,
+      "marginUsed": 35.876628,
+      "armed": true,
+      "h4_close": 1510.9,
+      "h4_upper": 1307.66668574,
+      "h4_filter": 1230.49046476,
+      "exit_signal": null,
+      "action": "HOLD",
+      "roe_px": 4.265,
+      "bar_utc": "2026-09-20T20:00:00+00:00"
+    }
+  ],
+  "open_orders": [
+    {
+      "coin": "ZEC",
+      "side": "A",
+      "limitPx": "1169.0",
+      "triggerPx": "1230.5",
+      "orderType": "Stop Market",
+      "sz": "0.07",
+      "oid": 551143311805,
+      "reduceOnly": true,
+      "isTrigger": true,
+      "isPositionTpsl": false,
+      "triggerCondition": "Price below 1230.5",
+      "tpsl": null
+    },
+    {
+      "coin": "HYPE",
+      "side": "A",
+      "limitPx": "77.367",
+      "triggerPx": "81.439",
+      "orderType": "Stop Market",
+      "sz": "1.25",
+      "oid": 551143265764,
+      "reduceOnly": true,
+      "isTrigger": true,
+      "isPositionTpsl": false,
+      "triggerCondition": "Price below 81.439",
+      "tpsl": null
+    },
+    {
+      "coin": "SOL",
+      "side": "A",
+      "limitPx": "96.491",
+      "triggerPx": "101.57",
+      "orderType": "Stop Market",
+      "sz": "1.04",
+      "oid": 550971207718,
+      "reduceOnly": true,
+      "isTrigger": true,
+      "isPositionTpsl": false,
+      "triggerCondition": "Price below 101.57",
+      "tpsl": null
+    },
+    {
+      "coin": "BRETT",
+      "side": "A",
+      "limitPx": "0.004659",
+      "triggerPx": "0.004904",
+      "orderType": "Stop Market",
+      "sz": "21623.0",
+      "oid": 550517551710,
+      "reduceOnly": true,
+      "isTrigger": true,
+      "isPositionTpsl": false,
+      "triggerCondition": "Price below 0.004904",
+      "tpsl": null
+    },
+    {
+      "coin": "AVNT",
+      "side": "A",
+      "limitPx": "0.09475",
+      "triggerPx": "0.099737",
+      "orderType": "Stop Market",
+      "sz": "1006.0",
+      "oid": 550517380040,
+      "reduceOnly": true,
+      "isTrigger": true,
+      "isPositionTpsl": false,
+      "triggerCondition": "Price below 0.099737",
+      "tpsl": null
+    },
+    {
+      "coin": "NIL",
+      "side": "A",
+      "limitPx": "0.040699",
+      "triggerPx": "0.042841",
+      "orderType": "Stop Market",
+      "sz": "2279.0",
+      "oid": 550517359100,
+      "reduceOnly": true,
+      "isTrigger": true,
+      "isPositionTpsl": false,
+      "triggerCondition": "Price below 0.042841",
+      "tpsl": null
+    },
+    {
+      "coin": "TRX",
+      "side": "A",
+      "limitPx": "0.32047",
+      "triggerPx": "0.33734",
+      "orderType": "Stop Market",
+      "sz": "336.0",
+      "oid": 550517331230,
+      "reduceOnly": true,
+      "isTrigger": true,
+      "isPositionTpsl": false,
+      "triggerCondition": "Price below 0.33734",
+      "tpsl": null
+    },
+    {
+      "coin": "ETH",
+      "side": "A",
+      "limitPx": "2355.4",
+      "triggerPx": "2479.4",
+      "orderType": "Stop Market",
+      "sz": "0.0443",
+      "oid": 550517307161,
+      "reduceOnly": true,
+      "isTrigger": true,
+      "isPositionTpsl": false,
+      "triggerCondition": "Price below 2479.4",
+      "tpsl": null
+    },
+    {
+      "coin": "BTC",
+      "side": "A",
+      "limitPx": "73517.0",
+      "triggerPx": "77386.0",
+      "orderType": "Stop Market",
+      "sz": "0.00142",
+      "oid": 550517296260,
+      "reduceOnly": true,
+      "isTrigger": true,
+      "isPositionTpsl": false,
+      "triggerCondition": "Price below 77386",
+      "tpsl": null
+    }
+  ],
+  "exit_monitor": {
+    "path": "/workspace/own-trend-radar/out/monitor_hl_exit.json",
+    "ts": "2026-09-21T00:28:13.442733+00:00",
+    "exits": [],
+    "holds": [
+      "BTC",
+      "ETH",
+      "SOL",
+      "TRX",
+      "BRETT",
+      "HYPE",
+      "NIL",
+      "AVNT",
+      "ZEC"
+    ]
+  },
+  "actions_this_run": [
+    {
+      "type": "freshness",
+      "1d_ok": false,
+      "4h_ok": true,
+      "4h_from": "monitor_per_position",
+      "universe_4h_scan": "done",
+      "n_4h": 144,
+      "breadth_4h": {
+        "green_count": 124,
+        "red_count": 20,
+        "green_pct": 86.11,
+        "n": 144
+      }
+    },
+    {
+      "type": "exit_monitor",
+      "exits": 0,
+      "holds": 9
+    },
+    {
+      "type": "sl_skip_aligned",
+      "coin": "BTC",
+      "trigger": 77386.0,
+      "filter": 77491.5319185,
+      "drift_pct": 0.1362,
+      "action": "skip_aligned"
+    },
+    {
+      "type": "sl_skip_aligned",
+      "coin": "ETH",
+      "trigger": 2479.4,
+      "filter": 2483.56159911,
+      "drift_pct": 0.1676,
+      "action": "skip_aligned"
+    },
+    {
+      "type": "sl_skip_aligned",
+      "coin": "SOL",
+      "trigger": 101.57,
+      "filter": 101.70592324,
+      "drift_pct": 0.1336,
+      "action": "skip_aligned"
+    },
+    {
+      "type": "sl_skip_aligned",
+      "coin": "TRX",
+      "trigger": 0.33734,
+      "filter": 0.3372552,
+      "drift_pct": 0.0251,
+      "action": "skip_aligned"
+    },
+    {
+      "type": "sl_skip_aligned",
+      "coin": "BRETT",
+      "trigger": 0.004904,
+      "filter": 0.00490456,
+      "drift_pct": 0.0114,
+      "action": "skip_aligned"
+    },
+    {
+      "type": "cancel",
+      "coin": "HYPE",
+      "oid": 550808159243,
+      "trigger": null,
+      "limit": null,
+      "filter_raw": null,
+      "reason": "drift>0.3% old trig=81.105 filter=81.43846574",
+      "result_status": "ok"
+    },
+    {
+      "type": "place_sl",
+      "coin": "HYPE",
+      "oid": null,
+      "trigger": 81.439,
+      "limit": 77.367,
+      "filter_raw": 81.43846574,
+      "reason": null,
+      "result_status": "ok"
+    },
+    {
+      "type": "sl_skip_aligned",
+      "coin": "NIL",
+      "trigger": 0.042841,
+      "filter": 0.04285469,
+      "drift_pct": 0.0319,
+      "action": "skip_aligned"
+    },
+    {
+      "type": "sl_skip_aligned",
+      "coin": "AVNT",
+      "trigger": 0.099737,
+      "filter": 0.09988552,
+      "drift_pct": 0.1487,
+      "action": "skip_aligned"
+    },
+    {
+      "type": "cancel",
+      "coin": "ZEC",
+      "oid": 550971232475,
+      "trigger": null,
+      "limit": null,
+      "filter_raw": null,
+      "reason": "drift>0.3% old trig=1222.8 filter=1230.49046476",
+      "result_status": "ok"
+    },
+    {
+      "type": "place_sl",
+      "coin": "ZEC",
+      "oid": null,
+      "trigger": 1230.5,
+      "limit": 1169.0,
+      "filter_raw": 1230.49046476,
+      "reason": null,
+      "result_status": "ok"
+    },
+    {
+      "type": "entries",
+      "action": "SKIP",
+      "reason": "prefer 08:40; 4H desk default skip entries/top-ups"
+    }
+  ],
+  "sl_realign_detail": {
+    "threshold_pct": 0.3,
+    "actions": [
+      {
+        "action": "cancel",
+        "coin": "HYPE",
+        "oid": 550808159243,
+        "reason": "drift>0.3% old trig=81.105 filter=81.43846574",
+        "result": {
+          "status": "ok",
+          "response": {
+            "type": "cancel",
+            "data": {
+              "statuses": [
+                "success"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "action": "place_sl",
+        "coin": "HYPE",
+        "sz": 1.25,
+        "trigger": 81.439,
+        "limit": 77.367,
+        "filter_raw": 81.43846574,
+        "result": {
+          "status": "ok",
+          "response": {
+            "type": "order",
+            "data": {
+              "statuses": [
+                {
+                  "resting": {
+                    "oid": 551143265764
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "action": "cancel",
+        "coin": "ZEC",
+        "oid": 550971232475,
+        "reason": "drift>0.3% old trig=1222.8 filter=1230.49046476",
+        "result": {
+          "status": "ok",
+          "response": {
+            "type": "cancel",
+            "data": {
+              "statuses": [
+                "success"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "action": "place_sl",
+        "coin": "ZEC",
+        "sz": 0.07,
+        "trigger": 1230.5,
+        "limit": 1169.0,
+        "filter_raw": 1230.49046476,
+        "result": {
+          "status": "ok",
+          "response": {
+            "type": "order",
+            "data": {
+              "statuses": [
+                {
+                  "resting": {
+                    "oid": 551143311805
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "aligned_skip": [
+      {
+        "coin": "BTC",
+        "trigger": 77386.0,
+        "filter": 77491.5319185,
+        "drift_pct": 0.1362,
+        "action": "skip_aligned"
+      },
+      {
+        "coin": "ETH",
+        "trigger": 2479.4,
+        "filter": 2483.56159911,
+        "drift_pct": 0.1676,
+        "action": "skip_aligned"
+      },
+      {
+        "coin": "SOL",
+        "trigger": 101.57,
+        "filter": 101.70592324,
+        "drift_pct": 0.1336,
+        "action": "skip_aligned"
+      },
+      {
+        "coin": "TRX",
+        "trigger": 0.33734,
+        "filter": 0.3372552,
+        "drift_pct": 0.0251,
+        "action": "skip_aligned"
+      },
+      {
+        "coin": "BRETT",
+        "trigger": 0.004904,
+        "filter": 0.00490456,
+        "drift_pct": 0.0114,
+        "action": "skip_aligned"
+      },
+      {
+        "coin": "NIL",
+        "trigger": 0.042841,
+        "filter": 0.04285469,
+        "drift_pct": 0.0319,
+        "action": "skip_aligned"
+      },
+      {
+        "coin": "AVNT",
+        "trigger": 0.099737,
+        "filter": 0.09988552,
+        "drift_pct": 0.1487,
+        "action": "skip_aligned"
+      }
+    ]
+  },
+  "candidates": {
+    "note": "1d missing; prior dual_cross reference only; entries skipped this 4H run",
+    "dual_cross_up_1d_prior": [
+      "AVNT",
+      "BRETT",
+      "MANTA",
+      "NIL",
+      "TRX"
+    ],
+    "dual_cross_up_4h": [
+      "CRV"
+    ]
+  },
+  "entries": {
+    "action": "SKIP",
+    "reason": "prefer 08:40; 4H desk default skip"
+  },
+  "exits_executed": [],
+  "notify_needed": true,
+  "notify_text": "Harbor 4H LIVE 2026-09-21 08:30 HKT: 9 longs all HOLD; USDC\u2248535/margin\u2248341/free\u2248194/uPnl\u2248+57.2; SL realign: HYPE\u219281.439, ZEC\u21921230.5; entries SKIP (prefer 08:40)",
+  "notes": [
+    "GC Lag/Fast OFF",
+    "Equity SoT = spotClearinghouseState USDC total only",
+    "No exits this run (all armed & close > Upper)",
+    "4H\u684c\u9762\u5b8c\u6210\uff1a9\u591a\u5168\u90e8HOLD\uff0c\u672a\u6709Upper-loss\u51fa\u5834\uff1bUSDC\u6b0a\u76ca\u2248535\uff0f\u4fdd\u8b49\u91d1\u2248341\uff0f\u53ef\u7528\u2248194\uff0fuPnl\u2248+57.2\uff1bSL\u6709\u66f4\u65b0\uff1aHYPE\u219281.439,ZEC\u21921230.5\uff1b\u5165\u5834skip\uff08\u7b4908:40\uff09"
+  ],
+  "desktop_sync": {
+    "target": "C:\\Users\\yumim\\Desktop\\harbor_desk_daily.json",
+    "status": "ok",
+    "machineId": "36380b07-289f-4f91-ae19-850b1f90453f",
+    "bytes": 17165
+  }
+}

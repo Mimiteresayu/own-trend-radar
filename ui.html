@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Harbor · HL Autotrade</title>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --panel: #11151c;
+    --panel2: #161b24;
+    --border: #1e2733;
+    --border2: #2a3545;
+    --text: #e8eef6;
+    --muted: #8b9bb0;
+    --green: #22c55e;
+    --green-dim: rgba(34, 197, 94, 0.14);
+    --red: #ef4444;
+    --red-dim: rgba(239, 68, 68, 0.14);
+    --accent: #38bdf8;
+    --amber: #f59e0b;
+    --pink: #f472b6;
+    --row-hover: #1a2330;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.45;
+    min-height: 100vh;
+  }
+  header.app-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .brand h1 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .brand h1 .dot { color: var(--muted); font-weight: 500; margin: 0 4px; }
+  .status-pill {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #1a2a1a;
+    color: var(--green);
+    border: 1px solid #2a4a2a;
+  }
+  .status-pill.warn {
+    background: rgba(245, 158, 11, 0.18);
+    color: var(--amber);
+    border-color: #6b4e12;
+  }
+  .status-pill.err {
+    background: var(--red-dim);
+    color: var(--red);
+    border-color: #5a1a1a;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .desk-clock {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .desk-clock strong { color: var(--text); font-weight: 600; }
+  .meta-line {
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+  }
+  .meta-line .ok { color: var(--green); }
+  .meta-line .err { color: var(--red); }
+
+  .nav-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 10px 18px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .nav-tabs button {
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 10px 14px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .nav-tabs button:hover { color: var(--text); }
+  .nav-tabs button.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+
+  main { padding: 14px 18px 36px; max-width: 1680px; margin: 0 auto; }
+
+  /* ——— Cockpit grid ——— */
+  .cockpit-grid {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr) 300px;
+    gap: 12px;
+    min-height: 72vh;
+  }
+  @media (max-width: 1100px) {
+    .cockpit-grid { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .panel-pad { padding: 14px; }
+  .left-col, .right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .center-col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .kpi-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .kpi-big {
+    font-family: var(--mono);
+    font-size: 1.65rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  .kpi-big.pos { color: var(--green); }
+  .kpi-big.neg { color: var(--pink); }
+  .kpi-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+  }
+  .kpi-row:last-child { border-bottom: none; }
+  .kpi-row .k { color: var(--muted); font-family: var(--sans); font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; }
+  .kpi-row .v { font-weight: 600; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .accent { color: var(--accent); }
+
+  .chart-area {
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+  }
+  .chart-area .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-head h2 {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .chart-split {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 0;
+    flex: 1;
+    min-height: 220px;
+  }
+  @media (max-width: 900px) {
+    .chart-split { grid-template-columns: 1fr; }
+  }
+  .chart-split .chart-box {
+    padding: 10px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 200px;
+  }
+  .chart-split .chart-box:last-child { border-right: none; }
+  .chart-box canvas {
+    width: 100%;
+    height: 180px;
+    display: block;
+  }
+  .chart-box img {
+    width: 100%;
+    height: 180px;
+    object-fit: contain;
+    background: #0d1118;
+    border-radius: 4px;
+  }
+  .chart-caption {
+    font-size: 0.68rem;
+    color: var(--muted);
+    margin-top: 6px;
+    font-family: var(--mono);
+  }
+
+  .mid-widgets {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+  @media (max-width: 900px) {
+    .mid-widgets { grid-template-columns: 1fr 1fr; }
+  }
+  .widget {
+    padding: 12px 14px;
+    min-height: 88px;
+  }
+  .widget .w-val {
+    font-family: var(--mono);
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-top: 6px;
+  }
+  .widget .w-sub {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 4px;
+    font-family: var(--mono);
+  }
+  .widget canvas.spark {
+    width: 100%;
+    height: 36px;
+    margin-top: 8px;
+    display: block;
+  }
+
+  .donut-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  @media (max-width: 700px) {
+    .donut-row { grid-template-columns: 1fr; }
+  }
+  .donut-card {
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .donut-wrap {
+    position: relative;
+    width: 88px;
+    height: 88px;
+    flex-shrink: 0;
+  }
+  .donut-wrap canvas { width: 88px; height: 88px; }
+  .donut-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .donut-center .n {
+    font-family: var(--mono);
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .donut-center .lbl {
+    font-size: 0.58rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .donut-legend {
+    font-size: 0.78rem;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .donut-legend .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .swatch {
+    width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;
+  }
+
+  .right-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .right-tabs button {
+    flex: 1;
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 10px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .right-tabs button.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+  .action-list, .pos-list {
+    max-height: 420px;
+    overflow-y: auto;
+    padding: 4px 0;
+  }
+  .action-item, .pos-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.75rem;
+  }
+  .action-item:hover, .pos-item:hover { background: var(--row-hover); }
+  .action-item .act {
+    font-family: var(--mono);
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .action-item .note {
+    color: var(--muted);
+    margin-top: 2px;
+    word-break: break-word;
+  }
+  .pos-item {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    gap: 6px;
+    align-items: center;
+    font-family: var(--mono);
+  }
+  .pos-item .coin { font-weight: 700; }
+  .pos-item .side-long { color: var(--green); font-size: 0.68rem; }
+  .pos-item .side-short { color: var(--red); font-size: 0.68rem; }
+  .pos-item .meta { color: var(--muted); font-size: 0.68rem; }
+  .empty-hint {
+    padding: 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  /* ——— Radar / shared table styles ——— */
+  .tf-tabs, .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .tf-tabs button, .filters button {
+    background: var(--panel);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .tf-tabs button:hover, .filters button:hover { color: var(--text); border-color: #2e4055; }
+  .tf-tabs button.active {
+    color: #0b0f14;
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .filters button.active {
+    color: var(--text);
+    border-color: var(--accent);
+    background: #0f1c28;
+  }
+  .breadth {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .breadth-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    align-items: center;
+  }
+  .stat { font-family: var(--mono); font-size: 0.9rem; }
+  .stat .g { color: var(--green); font-weight: 700; }
+  .stat .r { color: var(--red); font-weight: 700; }
+  .stat .pct { color: var(--accent); font-weight: 700; }
+  .bar-track {
+    height: 10px;
+    background: var(--red-dim);
+    border-radius: 5px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #16a34a, var(--green));
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+  .flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .chip {
+    font-family: var(--mono);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .chip.up { background: var(--green-dim); color: var(--green); border: 1px solid #1a5a30; }
+  .chip.down { background: var(--red-dim); color: var(--red); border: 1px solid #5a1a1a; }
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    min-width: 860px;
+  }
+  th, td {
+    padding: 8px 10px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  th:first-child, td:first-child,
+  th:nth-child(2), td:nth-child(2) { text-align: left; }
+  th {
+    position: sticky;
+    top: 0;
+    background: #0e141c;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+  }
+  th:hover { color: var(--text); }
+  th .arrow { opacity: 0.35; margin-left: 4px; }
+  th.sorted .arrow { opacity: 1; color: var(--accent); }
+  tbody tr:hover { background: var(--row-hover); }
+  tr.hl-up { background: var(--green-dim); }
+  tr.hl-up:hover { background: rgba(34, 197, 94, 0.22); }
+  tr.hl-down { background: var(--red-dim); }
+  tr.hl-down:hover { background: rgba(239, 68, 68, 0.22); }
+  .trend-g { color: var(--green); font-weight: 700; }
+  .trend-r { color: var(--red); font-weight: 700; }
+  .bool-y { color: var(--green); }
+  .bool-n { color: #3a4656; }
+  .bool-bad { color: var(--red); }
+  .empty {
+    padding: 32px;
+    text-align: center;
+    color: var(--muted);
+  }
+  footer {
+    margin-top: 16px;
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="brand">
+    <h1>Harbor<span class="dot">·</span>HL Autotrade</h1>
+    <span class="status-pill" id="statusPill">DRY_RUN</span>
+  </div>
+  <div class="header-right">
+    <div class="desk-clock" id="deskClock">Desk <strong>—</strong></div>
+    <div class="meta-line" id="meta">Loading…</div>
+  </div>
+</header>
+
+<nav class="nav-tabs" id="mainTabs" role="tablist" aria-label="Views">
+  <button type="button" data-view="cockpit" class="active" role="tab">Cockpit</button>
+  <button type="button" data-view="radar" role="tab">Radar</button>
+  <button type="button" data-view="narrative" role="tab">Narrative</button>
+  <button type="button" data-view="desk" role="tab">Desk</button>
+</nav>
+
+<main>
+  <!-- COCKPIT -->
+  <div id="cockpitPanel">
+    <div class="cockpit-grid">
+      <!-- LEFT -->
+      <aside class="left-col">
+        <div class="panel panel-pad">
+          <div class="kpi-label">Equity</div>
+          <div class="kpi-big" id="ckEq">—</div>
+          <div style="margin-top:12px">
+            <div class="kpi-row"><span class="k">Change / uPnL</span><span class="v" id="ckUpnl">—</span></div>
+            <div class="kpi-row"><span class="k">Margin used</span><span class="v" id="ckMargin">—</span></div>
+            <div class="kpi-row"><span class="k">Free USDC</span><span class="v accent" id="ckFree">—</span></div>
+            <div class="kpi-row"><span class="k">Breadth green</span><span class="v pos" id="ckBreadth">—</span></div>
+            <div class="kpi-row"><span class="k">Worst coin uPnL</span><span class="v" id="ckWorst">—</span></div>
+          </div>
+        </div>
+        <div class="panel panel-pad">
+          <div class="kpi-label">Account <span style="color:var(--muted);font-weight:400">(Unified)</span></div>
+          <div class="kpi-row"><span class="k">USDC (equity)</span><span class="v" id="ckSpot">—</span></div>
+          <div class="kpi-row"><span class="k">Margin view</span><span class="v" id="ckNav">—</span></div>
+          <div class="kpi-row"><span class="k">Notional</span><span class="v" id="ckNtl">—</span></div>
+          <div class="kpi-row"><span class="k">Wallet</span><span class="v" id="ckAddr" style="font-size:0.7rem">—</span></div>
+          <div class="chart-caption" style="margin-top:8px">Equity = USDC total. Margin view ≠ extra cash — do not add.</div>
+        </div>
+      </aside>
+
+      <!-- CENTER -->
+      <section class="center-col">
+        <div class="panel chart-area">
+          <div class="panel-head">
+            <h2>Equity / PnL</h2>
+            <span class="chart-caption" id="ckChartTs">—</span>
+          </div>
+          <div class="chart-split">
+            <div class="chart-box">
+              <canvas id="ckSparkEq" width="640" height="180" aria-label="uPnL spark"></canvas>
+              <div class="chart-caption">ΣuPnL spark · positions (desk)</div>
+              <img id="ckImgEq" src="out/charts/equity_snapshot.png" alt="equity snapshot" style="margin-top:8px;height:120px" onerror="this.style.display='none'" />
+            </div>
+            <div class="chart-box">
+              <img id="ckImgPnl" src="out/charts/positions_pnl.png" alt="positions pnl" onerror="this.style.display='none'" />
+              <div class="chart-caption">positions_pnl.png</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mid-widgets">
+          <div class="panel widget">
+            <div class="kpi-label">Breadth %</div>
+            <div class="w-val accent" id="ckWBreadth">—</div>
+            <div class="w-sub" id="ckWBreadthSub">1D green</div>
+            <canvas class="spark" id="sparkBreadth" width="200" height="36"></canvas>
+          </div>
+          <div class="panel widget">
+            <div class="kpi-label">BTC regime</div>
+            <div class="w-val" id="ckWBtc">—</div>
+            <div class="w-sub" id="ckWBtcSub">—</div>
+          </div>
+          <div class="panel widget">
+            <div class="kpi-label">Exposure</div>
+            <div class="w-val accent" id="ckWExp">—</div>
+            <div class="w-sub" id="ckWExpSub">margin / eq</div>
+            <canvas class="spark" id="sparkExp" width="200" height="36"></canvas>
+          </div>
+          <div class="panel widget">
+            <div class="kpi-label">Drawdown</div>
+            <div class="w-val" id="ckWDd">—</div>
+            <div class="w-sub">ΣuPnL / eq %</div>
+            <canvas class="spark" id="sparkDd" width="200" height="36"></canvas>
+          </div>
+        </div>
+
+        <div class="donut-row">
+          <div class="panel donut-card">
+            <div class="donut-wrap">
+              <canvas id="donutLong" width="88" height="88"></canvas>
+              <div class="donut-center"><span class="n" id="donutLongN">0</span><span class="lbl">Long</span></div>
+            </div>
+            <div class="donut-legend">
+              <div class="kpi-label" style="margin:0">Long / Short</div>
+              <div class="row"><span class="swatch" style="background:var(--green)"></span><span id="legLong">Long —</span></div>
+              <div class="row"><span class="swatch" style="background:var(--red)"></span><span id="legShort">Short —</span></div>
+            </div>
+          </div>
+          <div class="panel donut-card">
+            <div class="donut-wrap">
+              <canvas id="donutSleeve" width="88" height="88"></canvas>
+              <div class="donut-center"><span class="n" id="donutSleeveN">0</span><span class="lbl">Pos</span></div>
+            </div>
+            <div class="donut-legend">
+              <div class="kpi-label" style="margin:0">Own vs Majors</div>
+              <div class="row"><span class="swatch" style="background:var(--accent)"></span><span id="legOwn">Own —</span></div>
+              <div class="row"><span class="swatch" style="background:var(--amber)"></span><span id="legMaj">Majors —</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT -->
+      <aside class="right-col">
+        <div class="panel" style="flex:1;display:flex;flex-direction:column;min-height:280px">
+          <div class="right-tabs">
+            <button type="button" data-rtab="actions" class="active">Actions</button>
+            <button type="button" data-rtab="positions">Positions</button>
+          </div>
+          <div id="rtabActions" class="action-list"></div>
+          <div id="rtabPositions" class="pos-list hidden"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- RADAR -->
+  <div id="radarPanel" class="hidden">
+    <div class="tf-tabs" id="tfTabs" role="tablist" aria-label="Timeframes">
+      <button type="button" data-tf="1h" role="tab">1H</button>
+      <button type="button" data-tf="4h" role="tab">4H</button>
+      <button type="button" data-tf="1d" class="active" role="tab">1D</button>
+    </div>
+    <section class="breadth" id="breadth">
+      <div class="breadth-stats">
+        <div class="stat">Green <span class="g" id="gCount">—</span></div>
+        <div class="stat">Red <span class="r" id="rCount">—</span></div>
+        <div class="stat">Green% <span class="pct" id="gPct">—</span></div>
+        <div class="stat" style="color:var(--muted)">n=<span id="nCount">—</span></div>
+        <div class="stat" style="color:var(--muted)">tf=<span id="tfLabel">1d</span></div>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+      <div class="flags" id="flagLine"></div>
+    </section>
+    <div class="filters" id="filters" role="group" aria-label="Filters">
+      <button type="button" data-f="all" class="active">All</button>
+      <button type="button" data-f="green">Green</button>
+      <button type="button" data-f="red">Red</button>
+      <button type="button" data-f="dual_cross_up">Dual cross up</button>
+      <button type="button" data-f="dual_cross_down_filter">Dual cross down filter</button>
+      <button type="button" data-f="above_upper">Above upper</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-k="symbol">symbol <span class="arrow">↕</span></th>
+            <th data-k="trend">trend <span class="arrow">↕</span></th>
+            <th data-k="close">close <span class="arrow">↕</span></th>
+            <th data-k="filter">filter <span class="arrow">↕</span></th>
+            <th data-k="upper">upper <span class="arrow">↕</span></th>
+            <th data-k="lower">lower <span class="arrow">↕</span></th>
+            <th data-k="above_upper">above_upper <span class="arrow">↕</span></th>
+            <th data-k="dual_cross_up">dual_cross_up <span class="arrow">↕</span></th>
+            <th data-k="dual_cross_down_filter">dual_cross_down_filter <span class="arrow">↕</span></th>
+            <th data-k="drop_from_ath_pct">↓ from ATH% <span class="arrow">↕</span></th>
+            <th data-k="from_atl_pct">↑ from ATL% <span class="arrow">↕</span></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="empty" hidden>No rows match filter.</div>
+    </div>
+  </div>
+
+  <!-- DESK -->
+  <div id="deskPanel" class="hidden">
+    <section class="breadth">
+      <div class="breadth-stats">
+        <div class="stat">Total <span class="pct" id="dEq">—</span></div>
+        <div class="stat">Margin view <span id="dNav">—</span></div>
+        <div class="stat">uPnL <span class="g" id="dPnl">—</span></div>
+        <div class="stat" style="color:var(--muted)" id="dTs">—</div>
+      </div>
+      <div class="flags" id="deskSot"></div>
+    </section>
+    <h3 style="margin:12px 0 8px;font-size:0.95rem;color:var(--muted)">Positions</h3>
+    <div class="table-wrap"><table><thead><tr>
+      <th>coin</th><th>side</th><th>size</th><th>entry</th><th>value</th><th>uPnL</th><th>lev</th><th>liq</th>
+    </tr></thead><tbody id="deskPos"></tbody></table></div>
+    <h3 style="margin:16px 0 8px;font-size:0.95rem;color:var(--muted)">Candidates</h3>
+    <div class="table-wrap"><table><thead><tr>
+      <th>symbol</th><th>trend</th><th>cross</th><th>sleeve</th><th>note</th>
+    </tr></thead><tbody id="deskCand"></tbody></table></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div id="narrPanel" class="hidden">
+    <section class="breadth">
+      <div class="breadth-stats">
+        <div class="stat">Watch <span class="pct" id="nWatch">—</span></div>
+        <div class="stat">Bitunix GC <span class="g" id="nBuOk">—</span></div>
+        <div class="stat">cross_up <span class="g" id="nCross">—</span></div>
+        <div class="stat" style="color:var(--muted)">semi-auto · Bitunix</div>
+      </div>
+      <div class="flags" id="narrFlags"></div>
+    </section>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ticker</th>
+            <th>sector</th>
+            <th>venue</th>
+            <th>trend</th>
+            <th>close</th>
+            <th>upper</th>
+            <th>filter</th>
+            <th>above_upper</th>
+            <th>dual_cross_up</th>
+            <th>last cross</th>
+            <th>↓ ATH%</th>
+            <th>↑ ATL%</th>
+            <th>narrative</th>
+          </tr>
+        </thead>
+        <tbody id="narrBody"></tbody>
+      </table>
+      <div class="empty" id="narrEmpty" hidden>No narrative rows.</div>
+    </div>
+  </div>
+
+  <footer id="footer">Harbor cockpit · fetch out/desk_daily.json · no orders</footer>
+</main>
+
+<script>
+(function () {
+  const REFRESH_MS = 60000;
+  const MAJORS = new Set(["BTC", "ETH", "SOL", "HYPE", "ZEC"]);
+  const VALID_TFS = ["1h", "4h", "1d"];
+  let view = "cockpit";
+  let tf = "1d";
+  let rows = [];
+  let filter = "all";
+  let sortKey = "symbol";
+  let sortAsc = true;
+  let lastTs = null;
+  let rightTab = "actions";
+
+  const el = (id) => document.getElementById(id);
+
+  function dataUrl(t) { return "out/gc_radar_" + t + ".json"; }
+
+  function fmtUsd(v, digs) {
+    if (v == null || Number.isNaN(Number(v))) return "—";
+    const n = Number(v);
+    const d = digs != null ? digs : (Math.abs(n) >= 100 ? 2 : 2);
+    const s = n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+    return (n < 0 ? "-$" : "$") + s.replace("-", "");
+  }
+  function fmtPct(v, digs) {
+    if (v == null || Number.isNaN(Number(v))) return "—";
+    const n = Number(v);
+    const s = n.toFixed(digs != null ? digs : 2);
+    return (n > 0 ? "+" : "") + s + "%";
+  }
+  function fmtNum(v) {
+    if (v == null || Number.isNaN(v)) return "—";
+    const n = Number(v);
+    const a = Math.abs(n);
+    if (a >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    if (a >= 1) return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    return n.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 8 });
+  }
+  function boolCell(v, bad) {
+    if (v) return bad ? '<span class="bool-bad">true</span>' : '<span class="bool-y">true</span>';
+    return '<span class="bool-n">false</span>';
+  }
+  function signedClass(n) { return Number(n) >= 0 ? "pos" : "neg"; }
+
+  function showView(v) {
+    view = v;
+    el("cockpitPanel").classList.toggle("hidden", v !== "cockpit");
+    el("radarPanel").classList.toggle("hidden", v !== "radar");
+    el("deskPanel").classList.toggle("hidden", v !== "desk");
+    el("narrPanel").classList.toggle("hidden", v !== "narrative");
+    document.querySelectorAll("#mainTabs button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.view === v);
+    });
+  }
+
+  /* ——— canvas helpers ——— */
+  function drawSpark(canvas, values, color) {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const vals = (values || []).map(Number).filter((x) => !Number.isNaN(x));
+    if (vals.length < 2) {
+      ctx.strokeStyle = "#2a3545";
+      ctx.beginPath();
+      ctx.moveTo(0, h / 2);
+      ctx.lineTo(w, h / 2);
+      ctx.stroke();
+      return;
+    }
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const pad = (max - min) * 0.08 || 1;
+    const lo = min - pad, hi = max + pad;
+    ctx.strokeStyle = color || "#38bdf8";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    vals.forEach((v, i) => {
+      const x = (i / (vals.length - 1)) * (w - 2) + 1;
+      const y = h - ((v - lo) / (hi - lo)) * (h - 4) - 2;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    // fill
+    ctx.lineTo(w - 1, h);
+    ctx.lineTo(1, h);
+    ctx.closePath();
+    ctx.fillStyle = (color || "#38bdf8") + "22";
+    ctx.fill();
+  }
+
+  function drawBars(canvas, items, colorPos, colorNeg) {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const vals = items.map((x) => Number(x.uPnl) || 0);
+    if (!vals.length) return;
+    const maxAbs = Math.max(...vals.map(Math.abs), 0.01);
+    const n = vals.length;
+    const gap = 4;
+    const bw = Math.max(4, (w - gap * (n + 1)) / n);
+    const mid = h / 2;
+    vals.forEach((v, i) => {
+      const x = gap + i * (bw + gap);
+      const bh = (Math.abs(v) / maxAbs) * (h / 2 - 4);
+      ctx.fillStyle = v >= 0 ? (colorPos || "#22c55e") : (colorNeg || "#ef4444");
+      if (v >= 0) ctx.fillRect(x, mid - bh, bw, bh);
+      else ctx.fillRect(x, mid, bw, bh);
+    });
+    ctx.strokeStyle = "#2a3545";
+    ctx.beginPath();
+    ctx.moveTo(0, mid);
+    ctx.lineTo(w, mid);
+    ctx.stroke();
+  }
+
+  function drawDonut(canvas, parts) {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    const cx = w / 2, cy = h / 2;
+    const r = Math.min(w, h) / 2 - 2;
+    const rIn = r * 0.62;
+    ctx.clearRect(0, 0, w, h);
+    const total = parts.reduce((s, p) => s + Math.max(0, p.value), 0) || 1;
+    let a = -Math.PI / 2;
+    parts.forEach((p) => {
+      const slice = (Math.max(0, p.value) / total) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, a, a + slice);
+      ctx.arc(cx, cy, rIn, a + slice, a, true);
+      ctx.closePath();
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      a += slice;
+    });
+    // hole bg
+    ctx.beginPath();
+    ctx.arc(cx, cy, rIn - 0.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#11151c";
+    ctx.fill();
+  }
+
+  /* ——— Cockpit ——— */
+  async function loadCockpit() {
+    showView("cockpit");
+    el("footer").innerHTML = 'Cockpit · <code>out/desk_daily.json</code> + charts · no orders';
+    try {
+      const [dR, gR] = await Promise.all([
+        fetch("out/desk_daily.json?t=" + Date.now(), { cache: "no-store" }),
+        fetch("out/gc_radar_1d.json?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
+      ]);
+      if (!dR.ok) throw new Error("desk HTTP " + dR.status);
+      const d = await dR.json();
+      let radar = null;
+      if (gR && gR.ok) radar = await gR.json();
+
+      const a = d.account || {};
+      const pos = d.positions || [];
+      const breadth = d.breadth || (d.freshness && d.freshness.breadth_1d) || {};
+      const eq = Number(a.equity != null ? a.equity : (a.total_eq != null ? a.total_eq : a.spot_usdc)) || 0;
+      const upnl = Number(a.uPnl_sum) || 0;
+      const margin = Number(a.margin_used) || 0;
+      const free = Number(a.spot_usdc_free) || 0;
+      const ddPct = eq ? (upnl / eq) * 100 : 0;
+      const expPct = eq ? (margin / eq) * 100 : 0;
+
+      let worst = null;
+      pos.forEach((p) => {
+        if (!worst || Number(p.uPnl) < Number(worst.uPnl)) worst = p;
+      });
+
+      el("ckEq").textContent = fmtUsd(eq);
+      el("ckEq").className = "kpi-big " + signedClass(upnl);
+      el("ckUpnl").textContent = (upnl >= 0 ? "+" : "") + fmtUsd(upnl);
+      el("ckUpnl").className = "v " + signedClass(upnl);
+      el("ckMargin").textContent = fmtUsd(margin);
+      el("ckFree").textContent = fmtUsd(free);
+      el("ckBreadth").textContent = breadth.green_pct != null ? Number(breadth.green_pct).toFixed(2) + "%" : "—";
+      if (worst) {
+        el("ckWorst").textContent = worst.coin + " " + fmtUsd(worst.uPnl);
+        el("ckWorst").className = "v " + signedClass(worst.uPnl);
+      } else {
+        el("ckWorst").textContent = "—";
+      }
+      el("ckNav").textContent = fmtUsd(a.perp_nav);
+      el("ckSpot").textContent = fmtUsd(a.spot_usdc);
+      el("ckNtl").textContent = fmtUsd(a.total_ntl_pos);
+      el("ckAddr").textContent = a.address_short || "—";
+
+      el("ckWBreadth").textContent = breadth.green_pct != null ? Number(breadth.green_pct).toFixed(1) + "%" : "—";
+      el("ckWBreadthSub").textContent = (breadth.green_count ?? "—") + "G / " + (breadth.red_count ?? "—") + "R · n=" + (breadth.n ?? "—");
+
+      // BTC regime from desk candidates.majors or radar
+      let btc = (d.candidates && d.candidates.majors && d.candidates.majors.BTC) || null;
+      if (!btc && radar && Array.isArray(radar.rows)) {
+        btc = radar.rows.find((r) => r.symbol === "BTC") || null;
+      }
+      if (btc) {
+        const trend = btc.trend || "—";
+        el("ckWBtc").textContent = trend;
+        el("ckWBtc").className = "w-val " + (trend === "Green" ? "pos" : (trend === "Red" ? "neg" : ""));
+        const bits = [];
+        if (btc.above_upper) bits.push("Above Upper");
+        if (btc.chase_blocked) bits.push("chase blocked");
+        if (btc.close != null) bits.push("@" + fmtNum(btc.close));
+        el("ckWBtcSub").textContent = bits.join(" · ") || "—";
+      } else {
+        el("ckWBtc").textContent = "—";
+        el("ckWBtcSub").textContent = "no BTC row";
+      }
+
+      el("ckWExp").textContent = expPct.toFixed(1) + "%";
+      el("ckWExpSub").textContent = fmtUsd(margin) + " / " + fmtUsd(eq);
+      el("ckWDd").textContent = fmtPct(ddPct);
+      el("ckWDd").className = "w-val " + signedClass(ddPct);
+
+      el("ckChartTs").textContent = d.ts_hkt || d.ts || "—";
+      el("deskClock").innerHTML = "Desk <strong>" + (d.ts_hkt || "—") + "</strong>";
+
+      // status pill
+      const fresh = d.freshness || {};
+      const pill = el("statusPill");
+      if (fresh["1d_ok"] === false) {
+        pill.textContent = "STALE";
+        pill.className = "status-pill warn";
+      } else {
+        pill.textContent = "DRY_RUN";
+        pill.className = "status-pill";
+      }
+
+      // charts
+      const sorted = pos.slice().sort((x, y) => Number(x.uPnl) - Number(y.uPnl));
+      drawBars(el("ckSparkEq"), sorted);
+      // cache-bust images
+      const bust = "?t=" + Date.now();
+      el("ckImgEq").src = "out/charts/equity_snapshot.png" + bust;
+      el("ckImgPnl").src = "out/charts/positions_pnl.png" + bust;
+
+      const gPct = Number(breadth.green_pct) || 0;
+      drawSpark(el("sparkBreadth"), [40, 55, 62, 70, 75, 80, gPct], "#22c55e");
+      drawSpark(el("sparkExp"), [20, 30, 45, 50, expPct], "#38bdf8");
+      drawSpark(el("sparkDd"), [0, -0.2, -0.5, -0.4, ddPct], ddPct >= 0 ? "#22c55e" : "#ef4444");
+
+      // donuts
+      const longs = pos.filter((p) => String(p.side || "").toUpperCase() === "LONG");
+      const shorts = pos.filter((p) => String(p.side || "").toUpperCase() === "SHORT");
+      const own = pos.filter((p) => !MAJORS.has(String(p.coin || "").toUpperCase()));
+      const maj = pos.filter((p) => MAJORS.has(String(p.coin || "").toUpperCase()));
+      drawDonut(el("donutLong"), [
+        { value: longs.length || 0.0001, color: "#22c55e" },
+        { value: shorts.length, color: "#ef4444" },
+      ]);
+      el("donutLongN").textContent = String(longs.length);
+      el("legLong").textContent = "Long (" + (pos.length ? ((longs.length / pos.length) * 100).toFixed(0) : 0) + "%) · " + longs.length;
+      el("legShort").textContent = "Short (" + (pos.length ? ((shorts.length / pos.length) * 100).toFixed(0) : 0) + "%) · " + shorts.length;
+
+      drawDonut(el("donutSleeve"), [
+        { value: own.length || 0.0001, color: "#38bdf8" },
+        { value: maj.length || 0.0001, color: "#f59e0b" },
+      ]);
+      el("donutSleeveN").textContent = String(pos.length);
+      el("legOwn").textContent = "Own " + own.length + " · " + own.map((p) => p.coin).join(", ");
+      el("legMaj").textContent = "Majors " + maj.length + " · " + maj.map((p) => p.coin).join(", ");
+
+      // right panels
+      const actions = d.actions_this_run || [];
+      el("rtabActions").innerHTML = actions.length
+        ? actions.map((act) => {
+            const name = act.action || act.type || "action";
+            const note = act.note || act.reason || act.result || JSON.stringify(act).slice(0, 120);
+            return `<div class="action-item"><div class="act">${escapeHtml(name)}</div><div class="note">${escapeHtml(String(note))}</div></div>`;
+          }).join("")
+        : '<div class="empty-hint">No actions this run</div>';
+
+      el("rtabPositions").innerHTML = pos.length
+        ? pos.map((p) => {
+            const cls = signedClass(p.uPnl);
+            const side = String(p.side || "").toUpperCase();
+            return `<div class="pos-item">
+              <div><div class="coin">${escapeHtml(p.coin)}</div><div class="${side === "LONG" ? "side-long" : "side-short"}">${side}</div></div>
+              <div class="meta">val ${fmtUsd(p.positionValue)} · ${p.leverage || "—"}x</div>
+              <div class="${cls}">${fmtUsd(p.uPnl)}</div>
+            </div>`;
+          }).join("")
+        : '<div class="empty-hint">No open positions</div>';
+
+      el("meta").innerHTML = `view=<span class="ok">Cockpit</span> · eq=<span class="ok">${fmtUsd(eq)}</span> · uPnL=<span class="${upnl >= 0 ? "ok" : "err"}">${fmtUsd(upnl)}</span> · pos=${pos.length}`;
+    } catch (e) {
+      el("meta").innerHTML = `<span class="err">cockpit load failed: ${escapeHtml(e.message)}</span>`;
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  /* ——— Radar ——— */
+  function applyFilter(list) {
+    switch (filter) {
+      case "green": return list.filter((r) => r.trend === "Green");
+      case "red": return list.filter((r) => r.trend === "Red");
+      case "dual_cross_up": return list.filter((r) => r.dual_cross_up);
+      case "dual_cross_down_filter": return list.filter((r) => r.dual_cross_down_filter);
+      case "above_upper": return list.filter((r) => r.above_upper);
+      default: return list.slice();
+    }
+  }
+  function cmp(a, b) {
+    let va = a[sortKey], vb = b[sortKey];
+    if (typeof va === "boolean") { va = va ? 1 : 0; vb = vb ? 1 : 0; }
+    if (typeof va === "string") {
+      const c = va.localeCompare(vb || "", undefined, { sensitivity: "base" });
+      return sortAsc ? c : -c;
+    }
+    if (va == null) va = -Infinity;
+    if (vb == null) vb = -Infinity;
+    return sortAsc ? va - vb : vb - va;
+  }
+  function renderTable() {
+    const list = applyFilter(rows).sort(cmp);
+    const tb = el("tbody");
+    el("empty").hidden = list.length > 0;
+    tb.innerHTML = list.map((r) => {
+      let cls = "";
+      if (r.dual_cross_up) cls = "hl-up";
+      else if (r.dual_cross_down_filter) cls = "hl-down";
+      const trendCls = r.trend === "Green" ? "trend-g" : "trend-r";
+      return `<tr class="${cls}">
+        <td>${r.symbol}</td>
+        <td class="${trendCls}">${r.trend}</td>
+        <td>${fmtNum(r.close)}</td>
+        <td>${fmtNum(r.filter)}</td>
+        <td>${fmtNum(r.upper)}</td>
+        <td>${fmtNum(r.lower)}</td>
+        <td>${boolCell(r.above_upper)}</td>
+        <td>${boolCell(r.dual_cross_up)}</td>
+        <td>${boolCell(r.dual_cross_down_filter, true)}</td>
+        <td>${r.drop_from_ath_pct != null ? r.drop_from_ath_pct.toFixed(1) + "%" : "—"}</td>
+        <td>${r.from_atl_pct != null ? r.from_atl_pct.toFixed(1) + "%" : "—"}</td>
+      </tr>`;
+    }).join("");
+    document.querySelectorAll("#radarPanel th[data-k]").forEach((th) => {
+      th.classList.toggle("sorted", th.dataset.k === sortKey);
+      const arrow = th.querySelector(".arrow");
+      if (arrow) arrow.textContent = th.dataset.k === sortKey ? (sortAsc ? "↑" : "↓") : "↕";
+    });
+  }
+  function renderMeta(data) {
+    const dry = data.dry_run ? "DRY_RUN" : "LIVE?";
+    const ts = data.ts || "—";
+    lastTs = ts;
+    const curTf = data.tf || tf;
+    el("tfLabel").textContent = curTf;
+    el("meta").innerHTML = `tf=<span class="ok">${curTf}</span> · scan <span class="ok">${ts}</span> · ${dry} · n=${data.n_scanned ?? "—"}`;
+    const b = data.breadth || {};
+    el("gCount").textContent = b.green_count ?? "—";
+    el("rCount").textContent = b.red_count ?? "—";
+    el("gPct").textContent = b.green_pct != null ? b.green_pct.toFixed(2) + "%" : "—";
+    el("nCount").textContent = b.n ?? data.n_scanned ?? "—";
+    const pct = Number(b.green_pct) || 0;
+    el("barFill").style.width = Math.max(0, Math.min(100, pct)) + "%";
+    const f = data.flags || {};
+    const up = (f.dual_cross_up || []).map((s) => `<span class="chip up">${s}</span>`).join(" ") || "<span>—</span>";
+    const dn = (f.dual_cross_down_filter || []).map((s) => `<span class="chip down">${s}</span>`).join(" ") || "<span>—</span>";
+    el("flagLine").innerHTML = `dual_cross_up: ${up} &nbsp;&nbsp; dual_cross_down_filter: ${dn}`;
+    el("footer").innerHTML = `Auto-refresh every 60s · fetch <code>${dataUrl(tf)}</code> · no trading`;
+  }
+  function applyData(data) {
+    rows = Array.isArray(data.rows) ? data.rows : [];
+    renderMeta(data);
+    renderTable();
+  }
+  async function loadRadar() {
+    showView("radar");
+    try {
+      const r = await fetch(dataUrl(tf) + "?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const data = await r.json();
+      applyData(data);
+      el("meta").innerHTML = `tf=<span class="ok">${data.tf || tf}</span> · scan <span class="ok">${data.ts || "—"}</span> · DRY_RUN · n=${data.n_scanned ?? "—"} · refreshed`;
+    } catch (e) {
+      el("meta").innerHTML = `<span class="err">load failed (${tf}): ${escapeHtml(e.message)}</span>` +
+        (lastTs ? ` · last ok ${lastTs}` : "");
+      rows = [];
+      renderTable();
+    }
+  }
+
+  /* ——— Desk ——— */
+  async function loadDesk() {
+    showView("desk");
+    el("footer").innerHTML = 'Desk · <code>out/desk_daily.json</code> · daily 08:40 + on demand';
+    try {
+      const r = await fetch("out/desk_daily.json?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const d = await r.json();
+      const a = d.account || {};
+      const pnl = a.uPnl_sum || 0;
+      el("dEq").textContent = (a.equity ?? a.total_eq ?? a.spot_usdc) != null ? "$" + Number(a.equity ?? a.total_eq ?? a.spot_usdc).toFixed(2) : "—";
+      el("dNav").textContent = a.perp_nav != null ? "$" + Number(a.perp_nav).toFixed(2) : "—";
+      el("dPnl").textContent = (pnl >= 0 ? "+" : "") + "$" + Number(pnl).toFixed(4);
+      el("dPnl").className = pnl >= 0 ? "g" : "r";
+      el("dTs").textContent = d.ts_hkt || d.ts || "—";
+      const sot = d.sot || {};
+      el("deskSot").innerHTML = `own=${sot.entry_own_narrative || "—"} · majors=${sot.entry_majors || "—"} · SL=${sot.sl || "—"} · TP=${sot.tp || "—"} · size=${sot.size_pct || "—"}% · lev=${sot.leverage || "—"}`;
+      const pos = d.positions || [];
+      el("deskPos").innerHTML = pos.length ? pos.map((p) => {
+        const cls = (p.uPnl || 0) >= 0 ? "trend-g" : "trend-r";
+        return `<tr><td>${p.coin}</td><td>${p.side}</td><td>${p.size}</td><td>${fmtNum(p.entry)}</td><td>${fmtNum(p.positionValue)}</td><td class="${cls}">${p.uPnl}</td><td>${p.leverage || "—"}</td><td>${p.liq ?? "—"}</td></tr>`;
+      }).join("") : `<tr><td colspan="8" style="color:var(--muted)">No positions</td></tr>`;
+
+      // flatten candidates dict
+      const c = d.candidates || {};
+      const flat = [];
+      (c.dual_cross_up || []).forEach((x) => flat.push({ ...x, sleeve: "dual_cross_up" }));
+      (c.own_upper_new || []).forEach((x) => flat.push({ ...x, sleeve: "own_new" }));
+      (c.own_held_dual || []).forEach((x) => flat.push({ ...x, sleeve: "own_held" }));
+      (c.majors_filter_cross_green || []).forEach((x) => flat.push({ ...x, sleeve: "majors_filter" }));
+      (c.narrative_entry || []).forEach((x) => flat.push({ ...x, sleeve: "narrative" }));
+      if (c.majors && typeof c.majors === "object" && !Array.isArray(c.majors)) {
+        Object.keys(c.majors).forEach((sym) => {
+          const m = c.majors[sym];
+          flat.push({ symbol: sym, trend: m.trend, dual_cross_up: m.dual_cross_up || m.dual_cross_filter_up, sleeve: "majors", note: m.chase_blocked ? "chase blocked" : (m.new_entry_ok ? "entry ok" : "") });
+        });
+      }
+      el("deskCand").innerHTML = flat.length ? flat.slice(0, 60).map((c0) => {
+        const tcls = c0.trend === "Green" ? "trend-g" : "trend-r";
+        return `<tr class="${c0.dual_cross_up ? "hl-up" : ""}"><td>${c0.symbol || ""}</td><td class="${tcls}">${c0.trend || "—"}</td><td>${boolCell(!!c0.dual_cross_up)}</td><td>${c0.sleeve || "—"}</td><td style="max-width:280px;white-space:normal;color:var(--muted);font-size:0.75rem">${c0.note || ""}</td></tr>`;
+      }).join("") : `<tr><td colspan="5" style="color:var(--muted)">No candidates</td></tr>`;
+
+      el("meta").innerHTML = `view=<span class="ok">Desk</span> · ${d.ts_hkt || ""} · positions=${pos.length} · uPnL=<span class="${pnl >= 0 ? "ok" : "err"}">$${Number(pnl).toFixed(4)}</span>`;
+      el("deskClock").innerHTML = "Desk <strong>" + (d.ts_hkt || "—") + "</strong>";
+    } catch (e) {
+      el("meta").innerHTML = `<span class="err">desk load failed: ${escapeHtml(e.message)}</span>`;
+    }
+  }
+
+  /* ——— Narrative ——— */
+  async function loadNarrative() {
+    showView("narrative");
+    el("footer").innerHTML = 'Narrative · fetch <code>out/narrative_watchlist.json</code> + <code>out/bitunix_gc_1d.json</code> · Bitunix GC · semi-auto';
+    try {
+      const [wR, gR] = await Promise.all([
+        fetch("out/narrative_watchlist.json?t=" + Date.now(), { cache: "no-store" }),
+        fetch("out/bitunix_gc_1d.json?t=" + Date.now(), { cache: "no-store" }),
+      ]);
+      if (!wR.ok) throw new Error("watchlist HTTP " + wR.status);
+      const wl = await wR.json();
+      const gc = gR.ok ? await gR.json() : { items: [] };
+      const by = {};
+      (gc.items || []).forEach((x) => { if (x.ticker) by[String(x.ticker).toUpperCase()] = x; });
+      const items = wl.items || [];
+      let buOk = 0, cross = 0;
+      const crossNames = [];
+      const rowsHtml = items.map((it) => {
+        const t = String(it.ticker || "").toUpperCase();
+        const g = by[t] || {};
+        const trend = g.trend || (g.ok === false ? "—" : (it.gc_scan ? "…" : "n/a"));
+        const trendCls = trend === "Green" ? "trend-g" : (trend === "Red" ? "trend-r" : "");
+        if (g.ok) buOk += 1;
+        if (g.dual_cross_up) { cross += 1; crossNames.push(t); }
+        let cls = "";
+        if (g.dual_cross_up) cls = "hl-up";
+        else if (g.dual_cross_down_filter) cls = "hl-down";
+        const err = g.error ? ` <span class="err">(${escapeHtml(g.error)})</span>` : "";
+        return `<tr class="${cls}">
+          <td>${it.ticker || ""}${err}</td>
+          <td>${it.sector || ""}</td>
+          <td>${it.venue || ""}${it.bitunix_symbol ? " · " + it.bitunix_symbol : ""}</td>
+          <td class="${trendCls}">${trend}</td>
+          <td>${g.close != null ? fmtNum(g.close) : "—"}</td>
+          <td>${g.upper != null ? fmtNum(g.upper) : "—"}</td>
+          <td>${g.filter != null ? fmtNum(g.filter) : "—"}</td>
+          <td>${g.above_upper != null ? boolCell(!!g.above_upper) : "—"}</td>
+          <td>${g.dual_cross_up != null ? boolCell(!!g.dual_cross_up) : "—"}</td>
+          <td style="color:var(--muted)">${g.last_cross_up_hkt || "—"}</td>
+          <td>${g.drop_from_ath_pct != null ? Number(g.drop_from_ath_pct).toFixed(1) + "%" : "—"}</td>
+          <td>${g.from_atl_pct != null ? Number(g.from_atl_pct).toFixed(1) + "%" : "—"}</td>
+          <td style="max-width:280px;white-space:normal;color:var(--muted)">${it.narrative || ""}</td>
+        </tr>`;
+      }).join("");
+      el("nWatch").textContent = String(items.length);
+      el("nBuOk").textContent = String(buOk);
+      el("nCross").textContent = String(cross);
+      el("narrFlags").innerHTML = crossNames.length
+        ? ("dual_cross_up: " + crossNames.map((s) => `<span class="chip up">${s}</span>`).join(" "))
+        : "dual_cross_up: —";
+      el("narrBody").innerHTML = rowsHtml;
+      el("narrEmpty").hidden = items.length > 0;
+      el("meta").innerHTML = `view=<span class="ok">Narrative</span> · Bitunix GC · watch=${items.length} · updated <span class="ok">${wl.updated || "—"}</span>`;
+    } catch (e) {
+      el("meta").innerHTML = `<span class="err">narrative load failed: ${escapeHtml(e.message)}</span>`;
+      el("narrBody").innerHTML = "";
+      el("narrEmpty").hidden = false;
+    }
+  }
+
+  async function load() {
+    if (view === "cockpit") return loadCockpit();
+    if (view === "desk") return loadDesk();
+    if (view === "narrative") return loadNarrative();
+    return loadRadar();
+  }
+
+  el("mainTabs").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("button[data-view]");
+    if (!btn) return;
+    const next = btn.dataset.view;
+    if (next === view) return;
+    view = next;
+    load();
+  });
+
+  el("tfTabs").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("button[data-tf]");
+    if (!btn) return;
+    const next = btn.dataset.tf;
+    if (!VALID_TFS.includes(next) || next === tf) return;
+    tf = next;
+    document.querySelectorAll("#tfTabs button").forEach((b) => b.classList.toggle("active", b === btn));
+    if (view === "radar") loadRadar();
+  });
+
+  el("filters").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("button[data-f]");
+    if (!btn) return;
+    filter = btn.dataset.f;
+    document.querySelectorAll("#filters button").forEach((b) => b.classList.toggle("active", b === btn));
+    renderTable();
+  });
+
+  document.querySelectorAll("#radarPanel th[data-k]").forEach((th) => {
+    th.addEventListener("click", () => {
+      const k = th.dataset.k;
+      if (sortKey === k) sortAsc = !sortAsc;
+      else { sortKey = k; sortAsc = true; }
+      renderTable();
+    });
+  });
+
+  document.querySelector(".right-tabs").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("button[data-rtab]");
+    if (!btn) return;
+    rightTab = btn.dataset.rtab;
+    document.querySelectorAll(".right-tabs button").forEach((b) => b.classList.toggle("active", b === btn));
+    el("rtabActions").classList.toggle("hidden", rightTab !== "actions");
+    el("rtabPositions").classList.toggle("hidden", rightTab !== "positions");
+  });
+
+  // live clock
+  function tickClock() {
+    const now = new Date();
+    // Asia/Shanghai display
+    const hkt = now.toLocaleString("en-GB", { timeZone: "Asia/Shanghai", hour12: false });
+    const node = el("deskClock");
+    if (node && view === "cockpit") {
+      // keep desk ts as primary; append local
+      const strong = node.querySelector("strong");
+      if (strong && !strong.dataset.locked) {
+        /* desk ts set by load */
+      }
+    }
+    void hkt;
+  }
+  setInterval(tickClock, 1000);
+
+  load();
+  setInterval(load, REFRESH_MS);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+__pycache__
+*.pyc
+*.log
+*.bak
+*.bak.*
+ui_snapshot.html
+out/charts
+out/*.log
+.git
