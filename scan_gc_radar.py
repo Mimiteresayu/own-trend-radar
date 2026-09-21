@@ -3,7 +3,7 @@
 Own Trend Radar — multi-timeframe GC scan (DRY_RUN, no trading).
 
 GC math: DonovanWall / Signum Strategy v3.3
-  source=hlc3, poles=4, period=144, mult=1.414, Reduced Lag ON, Fast Response ON
+  source=hlc3, poles=4, mult=1.414, Lag/Fast OFF; period per TF: 1d=144, 4h=72, 1h=48
 Ported from /workspace/signum-compat-gc/gc.ts
 
 Usage:
@@ -11,6 +11,7 @@ Usage:
   python scan_gc_radar.py --tf 1d      # single TF
   python scan_gc_radar.py --tf 1h,4h   # subset
   python scan_gc_radar.py --max 80     # smaller universe (e.g. for 1h smoke)
+  python scan_gc_radar.py --tf 1d --max 250  # expanded liquid universe smoke
 """
 
 from __future__ import annotations
@@ -40,9 +41,14 @@ OUT_DIR = os.path.join(ROOT, "out")
 CANDIDATES_PATH = "/workspace/own_radar_candidates_base_v0.json"
 HL_INFO = "https://api.hyperliquid.xyz/info"
 
-MAX_SYMBOLS = 150  # Signum-like Top 100-150
-CONCURRENCY = 4  # polite; scanning 150×3 TFs is heavy
-REQUEST_PAUSE_S = 0.20  # polite rate limit between requests in a worker
+MAX_SYMBOLS = 280  # expanded liquid HL universe (~250–300; --max overrides)
+# Universe liquidity floor: dayNtlVlm >= $75k (between $50k–$100k).
+# Target ~200–400 names; exclude delisted / zero-vol dust. Soft: openInterest > 0.
+MIN_DAY_NTL_VLM = 75_000.0
+REQUIRE_OI_POSITIVE = True  # soft floor when OI present in assetCtxs
+RVOL_LOOKBACK = 14  # closed days prior used for median volume (RVOL)
+CONCURRENCY = 2  # polite; scanning ~280×TFs is heavy
+REQUEST_PAUSE_S = 0.35  # polite rate limit between requests in a worker
 HL_VOLUME_JSON = "/workspace/hl_volume_top100.json"
 
 GC_POLES = 4
@@ -59,33 +65,44 @@ VALID_TFS = ("1h", "2h", "4h", "1d")
 # 1d: ~280 days (existing)
 # 4h: ~450 bars (~75 days) — period*4h ≈ 24d min; fetch 400-500
 # 2h: ~500 bars (~40 days)
+# Per-TF GC period (TV lock 2026-09-21): 1D=144, 4H=72, 1H=48; 2h keep 144 until locked
 TF_CONFIG: Dict[str, Dict[str, Any]] = {
     "1h": {
         "interval": "1h",
         "bar_ms": 3600 * 1000,
         "n_bars": 400,
+        "period": 48,
         "out_stem": "gc_radar_1h",
     },
     "2h": {
         "interval": "2h",
         "bar_ms": 2 * 3600 * 1000,
         "n_bars": 500,
+        "period": 144,
         "out_stem": "gc_radar_2h",
     },
     "4h": {
         "interval": "4h",
         "bar_ms": 4 * 3600 * 1000,
         "n_bars": 450,
+        "period": 72,
         "out_stem": "gc_radar_4h",
     },
     "1d": {
         "interval": "1d",
         "bar_ms": 86400 * 1000,
         "n_bars": 280,
+        "period": 144,
         "out_stem": "gc_radar_1d",
         "alias_stem": "daily_gc_radar",  # back-compat
     },
 }
+
+
+def gc_period_for_tf(tf: str) -> int:
+    """Per-TF GC period; falls back to GC_PERIOD (1D SoT=144)."""
+    return int(TF_CONFIG.get(tf, {}).get("period") or GC_PERIOD)
+
 
 
 # ---------------------------------------------------------------------------
@@ -154,15 +171,16 @@ def load_base_v0(path: str = CANDIDATES_PATH, max_n: int = MAX_SYMBOLS) -> Optio
         return None
 
 
-def fetch_meta_universe() -> Tuple[List[Tuple[str, float]], List[str]]:
+def fetch_meta_universe() -> Tuple[List[Dict[str, Any]], List[str]]:
     """
-    Returns ([(name, dayNtlVlm), ...] sorted desc by vol), and meta universe names
-    in exchange order (non-delisted).
+    Returns ([{name, day_ntl_vlm, open_interest}, ...] sorted desc by dayNtlVlm),
+    and meta universe names in exchange order (non-delisted).
+    Pulls openInterest from assetCtxs when present (soft OI > 0 gate).
     """
     payload = hl_post({"type": "metaAndAssetCtxs"})
     meta, ctxs = payload[0], payload[1]
     universe = meta.get("universe") or []
-    rows: List[Tuple[str, float]] = []
+    rows: List[Dict[str, Any]] = []
     names_order: List[str] = []
     for i, u in enumerate(universe):
         name = u.get("name")
@@ -174,8 +192,13 @@ def fetch_meta_universe() -> Tuple[List[Tuple[str, float]], List[str]]:
             vol = float(ctx.get("dayNtlVlm") or 0)
         except (TypeError, ValueError):
             vol = 0.0
-        rows.append((name, vol))
-    rows.sort(key=lambda x: x[1], reverse=True)
+        oi_raw = ctx.get("openInterest")
+        try:
+            oi = float(oi_raw) if oi_raw is not None and oi_raw != "" else None
+        except (TypeError, ValueError):
+            oi = None
+        rows.append({"name": name, "day_ntl_vlm": vol, "open_interest": oi})
+    rows.sort(key=lambda x: x["day_ntl_vlm"], reverse=True)
     return rows, names_order
 
 
@@ -212,24 +235,54 @@ def pad_from_meta(names: List[str], meta_names: List[str], max_n: int) -> List[s
     return out[:max_n]
 
 
-def load_universe(max_n: int = MAX_SYMBOLS) -> Tuple[List[str], str]:
+def load_universe(max_n: int = MAX_SYMBOLS) -> Tuple[List[str], str, Dict[str, Any]]:
     """
-    Primary: HL metaAndAssetCtxs ranked by dayNtlVlm (Top 100-150 Signum scale).
-    If live dayNtlVlm are all/mostly zero: hl_volume_top100.json then pad from meta.
-    base_v0 is secondary/filter only (intersect if available; never primary).
+    Primary: HL metaAndAssetCtxs ranked by dayNtlVlm, with liquidity floors.
+    Floor: dayNtlVlm >= MIN_DAY_NTL_VLM ($75k) OR top-N by volume then pad;
+    soft OI > 0 when openInterest present. Exclude delisted / zero.
+    Target ~200–400 liquid HL names (default MAX_SYMBOLS=280).
+    If live dayNtlVlm mostly zero: hl_volume_top100.json then pad from meta.
+    base_v0 is secondary/filter only (prefer overlap; never primary).
+    Returns (names, universe_source, meta) where meta has floors + per-symbol ctx.
     """
     vol_rows, meta_names = fetch_meta_universe()
-    nonzero = sum(1 for _, v in vol_rows if v > 0)
+    ctx_by: Dict[str, Dict[str, Any]] = {r["name"]: r for r in vol_rows}
+    nonzero = sum(1 for r in vol_rows if r["day_ntl_vlm"] > 0)
+    floors = {
+        "min_day_ntl_vlm": MIN_DAY_NTL_VLM,
+        "require_oi_positive": REQUIRE_OI_POSITIVE,
+        "max_symbols": max_n,
+    }
+
     if nonzero >= max(20, max_n // 5):
-        names = [n for n, _ in vol_rows[:max_n]]
-        src = "hl_dayNtlVlm"
+        liquid = [
+            r for r in vol_rows
+            if r["day_ntl_vlm"] >= MIN_DAY_NTL_VLM
+            and (not REQUIRE_OI_POSITIVE or r.get("open_interest") is None or r["open_interest"] > 0)
+        ]
+        # If floor too strict for target size, fall back to top-N by volume (still exclude 0).
+        if len(liquid) < min(max_n, 80):
+            print(
+                f"[warn] dayNtlVlm>={MIN_DAY_NTL_VLM:.0f} yielded only {len(liquid)}; "
+                f"using top-{max_n} by volume (vol>0)",
+                file=sys.stderr,
+            )
+            liquid = [r for r in vol_rows if r["day_ntl_vlm"] > 0]
+            src = f"hl_dayNtlVlm_top{max_n}_volpad"
+        else:
+            src = f"hl_dayNtlVlm_ge{int(MIN_DAY_NTL_VLM)}"
+        names = [r["name"] for r in liquid[:max_n]]
+        # Pad with next-highest vol>0 if under max_n after OI soft filter
+        if len(names) < max_n:
+            names = pad_from_meta(names, [r["name"] for r in vol_rows if r["day_ntl_vlm"] > 0], max_n)
+            src = src + "+vol_pad"
     else:
         print(
             f"[warn] dayNtlVlm mostly zero (nonzero={nonzero}); "
             f"falling back to {HL_VOLUME_JSON}",
             file=sys.stderr,
         )
-        cached = load_hl_volume_json(max_n=100)
+        cached = load_hl_volume_json(max_n=min(100, max_n))
         if cached:
             names = pad_from_meta(cached, meta_names, max_n)
             src = "hl_volume_top100.json+meta_pad"
@@ -252,7 +305,19 @@ def load_universe(max_n: int = MAX_SYMBOLS) -> Tuple[List[str], str]:
             names = filtered
             src = src + "+base_v0_filter"
 
-    return names, src
+    meta = {
+        "floors": floors,
+        "n_meta_live": len(vol_rows),
+        "n_nonzero_day_ntl": nonzero,
+        "ctx_by_symbol": {
+            n: {
+                "day_ntl_vlm": (ctx_by.get(n) or {}).get("day_ntl_vlm"),
+                "open_interest": (ctx_by.get(n) or {}).get("open_interest"),
+            }
+            for n in names
+        },
+    }
+    return names, src, meta
 
 
 # ---------------------------------------------------------------------------
@@ -404,9 +469,53 @@ def compute_gc(
 # ---------------------------------------------------------------------------
 # Per-symbol scan row
 # ---------------------------------------------------------------------------
-def scan_symbol(coin: str, tf: str) -> Optional[dict]:
+def _median(xs: List[float]) -> Optional[float]:
+    ys = [x for x in xs if x is not None and x == x]  # drop NaN
+    if not ys:
+        return None
+    ys.sort()
+    m = len(ys)
+    mid = m // 2
+    if m % 2:
+        return float(ys[mid])
+    return float((ys[mid - 1] + ys[mid]) / 2.0)
+
+
+def compute_vol_momentum(bars: List[dict], i: int, lookback: int = RVOL_LOOKBACK) -> Dict[str, Any]:
+    """
+    Volume acceleration / RVOL from already-fetched candles (observe/rank only).
+    rvol = last closed bar volume / median(prior lookback volumes)
+    vol_change_pct = (v_today - v_yday) / v_yday * 100
+    mom_score = log1p(rvol)  (ranking only; does NOT gate dual_cross_up)
+    """
+    vols = [float(b.get("volume") or 0) for b in bars]
+    v_today = vols[i] if 0 <= i < len(vols) else 0.0
+    v_yday = vols[i - 1] if i >= 1 else 0.0
+    prior = vols[max(0, i - lookback) : i]
+    med = _median(prior)
+    rvol = (v_today / med) if med and med > 0 else None
+    vol_change_pct = ((v_today - v_yday) / v_yday * 100.0) if v_yday > 0 else None
+    if rvol is not None and rvol > 0:
+        mom_score = round(math.log1p(rvol), 6)
+    else:
+        mom_score = 0.0
+    # mild accel tilt when day-over-day vol rising
+    if vol_change_pct is not None and vol_change_pct > 0:
+        mom_score = round(mom_score + 0.05 * math.tanh(vol_change_pct / 100.0), 6)
+    return {
+        "rvol": round(rvol, 4) if rvol is not None else None,
+        "vol_change_pct": round(vol_change_pct, 2) if vol_change_pct is not None else None,
+        "vol_accel": round(rvol, 4) if rvol is not None else None,  # alias = RVOL
+        "mom_score": mom_score,
+        "v_today": round(v_today, 4),
+        "v_yday": round(v_yday, 4),
+    }
+
+
+def scan_symbol(coin: str, tf: str, ctx: Optional[Dict[str, Any]] = None) -> Optional[dict]:
+    period = gc_period_for_tf(tf)
     bars = fetch_candles(coin, tf)
-    min_bars = GC_PERIOD + 20
+    min_bars = period + 20
     if len(bars) < min_bars:
         print(
             f"[skip] {coin}@{tf}: only {len(bars)} bars (need >={min_bars})",
@@ -417,7 +526,7 @@ def scan_symbol(coin: str, tf: str) -> Optional[dict]:
     highs = [b["high"] for b in bars]
     lows = [b["low"] for b in bars]
     closes = [b["close"] for b in bars]
-    gc = compute_gc(highs, lows, closes)
+    gc = compute_gc(highs, lows, closes, period=period)
     # Use latest CLOSED daily/TF bar only (avoid showing yesterday's cross as "today")
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     bar_ms = TF_CONFIG[tf]["bar_ms"]
@@ -435,6 +544,7 @@ def scan_symbol(coin: str, tf: str) -> Optional[dict]:
     close = closes[i]
     prev_close = closes[i - 1]
 
+    # --- GC entry flags (LOCKED — do not change dual_cross math) ---
     trend = "Green" if filt > prev_filt else "Red"
     above_upper = close > upper
     dual_cross_up = close > upper and prev_close <= prev_upper
@@ -449,6 +559,19 @@ def scan_symbol(coin: str, tf: str) -> Optional[dict]:
     atl = min(lows)
     drop_from_ath_pct = round((ath - close) / ath * 100, 2) if ath else None
     from_atl_pct = round((close - atl) / atl * 100, 2) if atl else None
+
+    mom = compute_vol_momentum(bars, i)
+    ctx = ctx or {}
+    day_ntl = ctx.get("day_ntl_vlm")
+    oi = ctx.get("open_interest")
+    try:
+        day_ntl_f = float(day_ntl) if day_ntl is not None else None
+    except (TypeError, ValueError):
+        day_ntl_f = None
+    try:
+        oi_f = float(oi) if oi is not None else None
+    except (TypeError, ValueError):
+        oi_f = None
 
     return {
         "symbol": coin,
@@ -467,6 +590,13 @@ def scan_symbol(coin: str, tf: str) -> Optional[dict]:
         "last_cross_up_at": last_cross_up_at,
         "bars": len(bars),
         "bar_time": bars[i]["t"],
+        # momentum / liquidity observe-only (ranking; not entry gates)
+        "day_ntl_vlm": round(day_ntl_f, 2) if day_ntl_f is not None else None,
+        "open_interest": round(oi_f, 4) if oi_f is not None else None,
+        "rvol": mom["rvol"],
+        "vol_accel": mom["vol_accel"],
+        "vol_change_pct": mom["vol_change_pct"],
+        "mom_score": mom["mom_score"],
     }
 
 
@@ -489,6 +619,13 @@ CSV_FIELDS = [
     "from_atl_pct",
     "bars",
     "bar_time",
+    "day_ntl_vlm",
+    "open_interest",
+    "rvol",
+    "vol_accel",
+    "vol_change_pct",
+    "mom_score",
+    "mom_rank",
 ]
 
 
@@ -497,11 +634,14 @@ def scan_tf(
     symbols: List[str],
     universe_src: str,
     concurrency: int = CONCURRENCY,
+    universe_meta: Optional[Dict[str, Any]] = None,
 ) -> dict:
     """Scan all symbols for one TF; write JSON+CSV; return summary payload."""
     t0 = time.time()
     ts = datetime.now(timezone.utc).isoformat()
     cfg = TF_CONFIG[tf]
+    universe_meta = universe_meta or {}
+    ctx_by = universe_meta.get("ctx_by_symbol") or {}
     print(f"\n[tf={tf}] scanning n={len(symbols)} interval={cfg['interval']} "
           f"n_bars~={cfg['n_bars']} concurrency={concurrency}")
 
@@ -510,7 +650,7 @@ def scan_tf(
 
     def _job(sym: str) -> Tuple[str, Optional[dict], Optional[str]]:
         try:
-            return sym, scan_symbol(sym, tf), None
+            return sym, scan_symbol(sym, tf, ctx=ctx_by.get(sym)), None
         except Exception as e:
             return sym, None, str(e)
 
@@ -528,9 +668,25 @@ def scan_tf(
                     flag = " DUAL_UP"
                 elif row["dual_cross_down_filter"]:
                     flag = " DUAL_DN_FILT"
-                print(f"  [{tf}] {row['symbol']:12s} {row['trend']:5s} close={row['close']}{flag}")
+                mom = row.get("mom_score")
+                mom_s = f" mom={mom:.2f}" if isinstance(mom, (int, float)) else ""
+                print(f"  [{tf}] {row['symbol']:12s} {row['trend']:5s} close={row['close']}{flag}{mom_s}")
 
-    rows.sort(key=lambda r: r["symbol"])
+    # mom_rank: 1 = highest mom_score (observe/priority only)
+    by_mom = sorted(rows, key=lambda r: (-(r.get("mom_score") or 0), r["symbol"]))
+    rank_map = {r["symbol"]: i + 1 for i, r in enumerate(by_mom)}
+    for r in rows:
+        r["mom_rank"] = rank_map.get(r["symbol"])
+
+    # Display/candidate priority: dual_cross_up first, then mom_score, then symbol.
+    # Does NOT change which rows get dual_cross_up=true (GC only).
+    rows.sort(
+        key=lambda r: (
+            0 if r.get("dual_cross_up") else 1,
+            -(r.get("mom_score") or 0),
+            r["symbol"],
+        )
+    )
 
     green_count = sum(1 for r in rows if r["trend"] == "Green")
     red_count = sum(1 for r in rows if r["trend"] == "Red")
@@ -541,6 +697,11 @@ def scan_tf(
     dual_dn = [r["symbol"] for r in rows if r["dual_cross_down_filter"]]
     above = [r["symbol"] for r in rows if r["above_upper"]]
 
+    floors = (universe_meta.get("floors") or {
+        "min_day_ntl_vlm": MIN_DAY_NTL_VLM,
+        "require_oi_positive": REQUIRE_OI_POSITIVE,
+        "max_symbols": len(symbols),
+    })
     payload = {
         "tf": tf,
         "ts": ts,
@@ -548,7 +709,7 @@ def scan_tf(
         "gc_params": {
             "source": "hlc3",
             "poles": GC_POLES,
-            "period": GC_PERIOD,
+            "period": gc_period_for_tf(tf),
             "mult": GC_MULT,
             "reducedLag": GC_REDUCED_LAG,
             "fastResponse": GC_FAST_RESPONSE,
@@ -556,6 +717,11 @@ def scan_tf(
         "universe_source": universe_src,
         "universe_requested": symbols,
         "n_scanned": n,
+        "universe_floors": floors,
+        "momentum_note": (
+            "rvol/vol_accel/vol_change_pct/mom_score/mom_rank are observe+rank only; "
+            "dual_cross_up GC entry math unchanged"
+        ),
         "errors": errors,
         "breadth": {
             "green_count": green_count,
@@ -642,18 +808,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     os.makedirs(OUT_DIR, exist_ok=True)
     t_all = time.time()
 
-    symbols, universe_src = load_universe(max_n)
-    print(f"[info] universe={universe_src} n={len(symbols)} concurrency={concurrency}")
+    symbols, universe_src, universe_meta = load_universe(max_n)
+    floors = universe_meta.get("floors") or {}
+    print(
+        f"[info] universe={universe_src} n={len(symbols)} concurrency={concurrency} "
+        f"floor_dayNtlVlm>={floors.get('min_day_ntl_vlm')} oi_soft={floors.get('require_oi_positive')}"
+    )
     print(f"[info] TFs={','.join(tfs)}")
     print(
         f"[info] GC poles={GC_POLES} period={GC_PERIOD} mult={GC_MULT} "
-        f"lag={GC_REDUCED_LAG} fast={GC_FAST_RESPONSE}"
+        f"lag={GC_REDUCED_LAG} fast={GC_FAST_RESPONSE} (entry unchanged)"
     )
 
     summaries: List[dict] = []
-    # Sequential TFs with shared concurrency pool per TF — avoids 150×3 hammering HL
+    # Sequential TFs with shared concurrency pool per TF — avoids N×TFs hammering HL
     for tf in tfs:
-        payload = scan_tf(tf, symbols, universe_src, concurrency=concurrency)
+        payload = scan_tf(
+            tf, symbols, universe_src, concurrency=concurrency, universe_meta=universe_meta
+        )
         summaries.append(payload)
 
     total = time.time() - t_all

@@ -19,6 +19,9 @@ FILES = [
     "out/bitunix_gc_1d.json",
     "out/monitor_hl_exit.json",
     "out/suggested_exits.json",
+    "out/curves_compare.json",
+    "out/equity_history.json",
+    "out/gc_radar_1h.json",
 ]
 
 def main() -> int:

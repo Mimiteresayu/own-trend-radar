@@ -131,13 +131,33 @@
   /* ——— Cockpit grid ——— */
   .cockpit-grid {
     display: grid;
-    grid-template-columns: 220px minmax(0, 1fr) 300px;
+    grid-template-columns: 200px minmax(0, 1fr) 240px;
     gap: 12px;
-    min-height: 72vh;
   }
   @media (max-width: 1100px) {
     .cockpit-grid { grid-template-columns: 1fr; }
   }
+  .cockpit-bottom { margin-top: 12px; }
+  .pos-table-wrap { overflow: auto; max-height: none; }
+  .pos-table-wrap table { font-size: 0.82rem; }
+  .pos-table-wrap th { white-space: nowrap; position: sticky; top: 0; background: var(--panel); z-index: 1; }
+  .pos-table-wrap td { padding: 8px 10px; vertical-align: middle; }
+  .color-legend {
+    display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center;
+    font-size: 0.75rem; color: var(--muted); padding: 8px 12px;
+  }
+  .color-legend .lg { color: var(--green); font-weight: 600; }
+  .color-legend .lr { color: var(--red); font-weight: 600; }
+  .curve-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.72rem; color: var(--muted); margin-top: 6px; }
+  .curve-legend span::before {
+    content: ""; display: inline-block; width: 10px; height: 3px; margin-right: 6px;
+    vertical-align: middle; border-radius: 1px; background: currentColor;
+  }
+  .curve-legend .eq { color: #38bdf8; }
+  .curve-legend .btc { color: #f59e0b; }
+  .curve-legend .bun { color: #a78bfa; }
+  .chart-box.full { min-height: 220px; }
+  .chart-box.full canvas { width: 100%; height: 220px; }
   .panel {
     background: var(--panel);
     border: 1px solid var(--border);
@@ -597,21 +617,19 @@
 
       <!-- CENTER -->
       <section class="center-col">
-        <div class="panel chart-area">
+        <div class="panel chart-area panel-pad">
           <div class="panel-head">
-            <h2>Equity / PnL</h2>
+            <h2>Equity vs BTC vs Bitunix</h2>
             <span class="chart-caption" id="ckChartTs">—</span>
           </div>
-          <div class="chart-split">
-            <div class="chart-box">
-              <canvas id="ckSparkEq" width="640" height="180" aria-label="uPnL spark"></canvas>
-              <div class="chart-caption">ΣuPnL spark · positions (desk)</div>
-              <img id="ckImgEq" src="out/charts/equity_snapshot.png" alt="equity snapshot" style="margin-top:8px;height:120px" onerror="this.style.display='none'" />
+          <div class="chart-box full">
+            <canvas id="ckCurve" width="900" height="240" aria-label="equity vs btc vs bitunix"></canvas>
+            <div class="curve-legend">
+              <span class="eq">HL Equity %</span>
+              <span class="btc">BTC %</span>
+              <span class="bun">Bitunix BTC %</span>
             </div>
-            <div class="chart-box">
-              <img id="ckImgPnl" src="out/charts/positions_pnl.png" alt="positions pnl" onerror="this.style.display='none'" />
-              <div class="chart-caption">positions_pnl.png</div>
-            </div>
+            <div class="chart-caption" id="ckCurveNote">Normalized % from first point · equity history builds each desk run</div>
           </div>
         </div>
 
@@ -634,9 +652,9 @@
             <canvas class="spark" id="sparkExp" width="200" height="36"></canvas>
           </div>
           <div class="panel widget">
-            <div class="kpi-label">Drawdown</div>
+            <div class="kpi-label">uPnL / eq</div>
             <div class="w-val" id="ckWDd">—</div>
-            <div class="w-sub">ΣuPnL / eq %</div>
+            <div class="w-sub">green + · red −</div>
             <canvas class="spark" id="sparkDd" width="200" height="36"></canvas>
           </div>
         </div>
@@ -667,17 +685,40 @@
         </div>
       </section>
 
-      <!-- RIGHT -->
+      <!-- RIGHT: actions only -->
       <aside class="right-col">
-        <div class="panel" style="flex:1;display:flex;flex-direction:column;min-height:280px">
-          <div class="right-tabs">
-            <button type="button" data-rtab="actions" class="active">Actions</button>
-            <button type="button" data-rtab="positions">Positions</button>
+        <div class="panel" style="flex:1;display:flex;flex-direction:column;min-height:200px">
+          <div class="panel-head" style="padding:10px 12px;border-bottom:1px solid var(--border)">
+            <h2 style="margin:0;font-size:0.85rem">Actions</h2>
           </div>
           <div id="rtabActions" class="action-list"></div>
-          <div id="rtabPositions" class="pos-list hidden"></div>
         </div>
       </aside>
+    </div>
+
+    <!-- Positions: full-width table (readable) -->
+    <div class="cockpit-bottom">
+      <div class="panel">
+        <div class="panel-head" style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <h2 style="margin:0;font-size:0.95rem">Positions</h2>
+          <div class="color-legend">
+            <span><span class="lg">Green = positive (+)</span></span>
+            <span><span class="lr">Red = negative (−)</span></span>
+            <span>1H/4H/Nb/Mom = PnL if exit at that level</span>
+          </div>
+        </div>
+        <div class="pos-table-wrap table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>coin</th><th>side</th><th>size</th><th>entry</th><th>value</th><th>uPnL</th><th>lev</th><th>liq</th>
+                <th>SL 4H Filter</th><th>1H</th><th>4H</th><th>Nbar</th><th>Mom</th>
+              </tr>
+            </thead>
+            <tbody id="ckPosTable"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -722,6 +763,10 @@
             <th data-k="dual_cross_down_filter">dual_cross_down_filter <span class="arrow">↕</span></th>
             <th data-k="drop_from_ath_pct">↓ from ATH% <span class="arrow">↕</span></th>
             <th data-k="from_atl_pct">↑ from ATL% <span class="arrow">↕</span></th>
+            <th data-k="day_ntl_vlm">dayNtlVlm <span class="arrow">↕</span></th>
+            <th data-k="vol_accel">vol_accel <span class="arrow">↕</span></th>
+            <th data-k="mom_score">mom_score <span class="arrow">↕</span></th>
+            <th data-k="mom_rank">mom_rank <span class="arrow">↕</span></th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -742,7 +787,7 @@
       <div class="flags" id="deskSot"></div>
     </section>
     <h3 style="margin:12px 0 8px;font-size:0.95rem;color:var(--muted)">Positions</h3>
-    <div class="observe-banner" id="deskExitBanner">suggested only — no order changes</div>
+    <div class="observe-banner" id="deskExitBanner">suggested only — 1H=Lower(48) · 4H=Filter(72) — no orders</div>
     <div class="table-wrap"><table><thead><tr>
       <th>coin</th><th>side</th><th>size</th><th>entry</th><th>value</th><th>uPnL</th><th>lev</th><th>liq</th>
       <th>1H</th><th>4H</th><th>Nbar</th><th>Mom</th>
@@ -801,8 +846,8 @@
   let tf = "1d";
   let rows = [];
   let filter = "all";
-  let sortKey = "symbol";
-  let sortAsc = true;
+  let sortKey = "mom_score";
+  let sortAsc = false;
   let lastTs = null;
   let rightTab = "actions";
 
@@ -937,6 +982,76 @@
     ctx.fill();
   }
 
+  function drawCompareCurves(canvas, curves) {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#11151c";
+    ctx.fillRect(0, 0, w, h);
+    if (!curves || !curves.labels || !curves.labels.length) {
+      ctx.fillStyle = "#8b949e";
+      ctx.font = "12px sans-serif";
+      ctx.fillText("No curve data yet — run build_equity_curves.py", 16, h / 2);
+      return;
+    }
+    const series = [
+      { key: "equity_pct", color: "#38bdf8", label: "HL Equity" },
+      { key: "btc_pct", color: "#f59e0b", label: "BTC" },
+      { key: "bitunix_pct", color: "#a78bfa", label: "Bitunix BTC" },
+    ];
+    let min = Infinity, max = -Infinity;
+    series.forEach((s) => {
+      (curves[s.key] || []).forEach((v) => {
+        if (v == null || Number.isNaN(Number(v))) return;
+        min = Math.min(min, Number(v));
+        max = Math.max(max, Number(v));
+      });
+    });
+    if (!Number.isFinite(min) || !Number.isFinite(max)) { min = -1; max = 1; }
+    if (min === max) { min -= 1; max += 1; }
+    const pad = (max - min) * 0.12 || 1;
+    const lo = min - pad, hi = max + pad;
+    const left = 44, right = 12, top = 12, bottom = 28;
+    const pw = w - left - right, ph = h - top - bottom;
+    // zero line
+    const y0 = top + (1 - (0 - lo) / (hi - lo)) * ph;
+    ctx.strokeStyle = "#2a3545";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(left, y0);
+    ctx.lineTo(left + pw, y0);
+    ctx.stroke();
+    // axes labels
+    ctx.fillStyle = "#8b949e";
+    ctx.font = "10px monospace";
+    ctx.fillText(hi.toFixed(1) + "%", 4, top + 10);
+    ctx.fillText(lo.toFixed(1) + "%", 4, top + ph);
+    const n = curves.labels.length;
+    series.forEach((s) => {
+      const vals = curves[s.key] || [];
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let started = false;
+      for (let i = 0; i < n; i++) {
+        const v = vals[i];
+        if (v == null || Number.isNaN(Number(v))) { started = false; continue; }
+        const x = left + (n === 1 ? pw / 2 : (i / (n - 1)) * pw);
+        const y = top + (1 - (Number(v) - lo) / (hi - lo)) * ph;
+        if (!started) { ctx.moveTo(x, y); started = true; }
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    });
+    // x labels ends
+    if (n) {
+      ctx.fillStyle = "#8b949e";
+      ctx.fillText(String(curves.labels[0]).slice(5), left, h - 8);
+      ctx.fillText(String(curves.labels[n - 1]).slice(5), left + pw - 36, h - 8);
+    }
+  }
+
   /* ——— Cockpit ——— */
   async function loadCockpit() {
     showView("cockpit");
@@ -1025,13 +1140,19 @@
         pill.className = "status-pill";
       }
 
-      // charts
-      const sorted = pos.slice().sort((x, y) => Number(x.uPnl) - Number(y.uPnl));
-      drawBars(el("ckSparkEq"), sorted);
-      // cache-bust images
-      const bust = "?t=" + Date.now();
-      el("ckImgEq").src = "out/charts/equity_snapshot.png" + bust;
-      el("ckImgPnl").src = "out/charts/positions_pnl.png" + bust;
+      // curves: equity vs BTC vs Bitunix
+      try {
+        const cR = await fetch("out/curves_compare.json?t=" + Date.now(), { cache: "no-store" });
+        if (cR.ok) {
+          const curves = await cR.json();
+          drawCompareCurves(el("ckCurve"), curves);
+          if (curves.note) el("ckCurveNote").textContent = curves.note;
+        } else {
+          drawCompareCurves(el("ckCurve"), null);
+        }
+      } catch (e) {
+        drawCompareCurves(el("ckCurve"), null);
+      }
 
       const gPct = Number(breadth.green_pct) || 0;
       drawSpark(el("sparkBreadth"), [40, 55, 62, 70, 75, 80, gPct], "#22c55e");
@@ -1069,27 +1190,36 @@
           }).join("")
         : '<div class="empty-hint">No actions this run</div>';
 
-      el("rtabPositions").innerHTML = pos.length
+      const exCell = (ex) => {
+        if (!ex || ex.px == null) return "—";
+        const pnl = Number(ex.pnl_usd);
+        const cls = pnl >= 0 ? "pos" : "neg";
+        const s = pnl >= 0 ? "+" : "−";
+        return `<span class="${cls}">${s}$${Math.abs(pnl).toFixed(2)}</span>`;
+      };
+      el("ckPosTable").innerHTML = pos.length
         ? pos.map((p) => {
             const cls = signedClass(p.uPnl);
             const side = String(p.side || "").toUpperCase();
             const se = p.suggested_exits || {};
-            const exLine = (lab, ex) => {
-              if (!ex || ex.px == null) return `<div class="ex">${lab} —</div>`;
-              const pnl = Number(ex.pnl_usd);
-              const pc = pnl >= 0 ? "pos" : "neg";
-              const s = pnl >= 0 ? "+" : "";
-              const fade = ex.mom_vol_fade ? "↓" : "";
-              return `<div class="ex">${lab} <span class="pnl ${pc}">${s}$${Math.abs(pnl).toFixed(1)}</span>${fade}</div>`;
-            };
-            return `<div class="pos-item">
-              <div><div class="coin">${escapeHtml(p.coin)}</div><div class="${side === "LONG" ? "side-long" : "side-short"}">${side}</div></div>
-              <div class="meta">val ${fmtUsd(p.positionValue)} · ${p.leverage || "—"}x</div>
-              <div class="${cls}">${fmtUsd(p.uPnl)}</div>
-              <div class="pos-exits">${exLine("1H", se.h1)}${exLine("4H", se.h4)}${exLine("Nb", se.nbar)}${exLine("Mom", se.mom)}</div>
-            </div>`;
+            const sl = p.h4_filter != null ? fmtNum(p.h4_filter) : "—";
+            return `<tr>
+              <td><strong>${escapeHtml(p.coin)}</strong></td>
+              <td class="${side === "LONG" ? "pos" : "neg"}">${side}</td>
+              <td>${p.size ?? p.sz ?? "—"}</td>
+              <td>${fmtNum(p.entry)}</td>
+              <td>${fmtUsd(p.positionValue)}</td>
+              <td class="${cls}">${fmtUsd(p.uPnl)}</td>
+              <td>${p.leverage || "—"}x</td>
+              <td>${p.liq != null ? fmtNum(p.liq) : "—"}</td>
+              <td>${sl}</td>
+              <td>${exCell(se.h1)}</td>
+              <td>${exCell(se.h4)}</td>
+              <td>${exCell(se.nbar)}</td>
+              <td>${exCell(se.mom)}</td>
+            </tr>`;
           }).join("")
-        : '<div class="empty-hint">No open positions</div>';
+        : `<tr><td colspan="13" style="color:var(--muted)">No open positions</td></tr>`;
 
       el("meta").innerHTML = `view=<span class="ok">Cockpit</span> · eq=<span class="ok">${fmtUsd(eq)}</span> · uPnL=<span class="${upnl >= 0 ? "ok" : "err"}">${fmtUsd(upnl)}</span> · pos=${pos.length}`;
     } catch (e) {
@@ -1144,6 +1274,10 @@
         <td>${boolCell(r.dual_cross_down_filter, true)}</td>
         <td>${r.drop_from_ath_pct != null ? r.drop_from_ath_pct.toFixed(1) + "%" : "—"}</td>
         <td>${r.from_atl_pct != null ? r.from_atl_pct.toFixed(1) + "%" : "—"}</td>
+        <td>${r.day_ntl_vlm != null ? fmtNum(r.day_ntl_vlm) : "—"}</td>
+        <td>${r.vol_accel != null ? Number(r.vol_accel).toFixed(2) : (r.rvol != null ? Number(r.rvol).toFixed(2) : "—")}</td>
+        <td>${r.mom_score != null ? Number(r.mom_score).toFixed(3) : "—"}</td>
+        <td>${r.mom_rank != null ? r.mom_rank : "—"}</td>
       </tr>`;
     }).join("");
     document.querySelectorAll("#radarPanel th[data-k]").forEach((th) => {
@@ -1158,7 +1292,9 @@
     lastTs = ts;
     const curTf = data.tf || tf;
     el("tfLabel").textContent = curTf;
-    el("meta").innerHTML = `tf=<span class="ok">${curTf}</span> · scan <span class="ok">${ts}</span> · ${dry} · n=${data.n_scanned ?? "—"}`;
+    const floors = data.universe_floors || {};
+    const floorNote = floors.min_day_ntl_vlm != null ? ` · floor dayNtl≥$${Number(floors.min_day_ntl_vlm).toLocaleString()}` : "";
+    el("meta").innerHTML = `tf=<span class="ok">${curTf}</span> · scan <span class="ok">${ts}</span> · ${dry} · n=${data.n_scanned ?? "—"}${floorNote}`;
     const b = data.breadth || {};
     el("gCount").textContent = b.green_count ?? "—";
     el("rCount").textContent = b.red_count ?? "—";
@@ -1218,6 +1354,8 @@
       el("dPnl").textContent = (pnl >= 0 ? "+" : "") + "$" + Number(pnl).toFixed(4);
       el("dPnl").className = pnl >= 0 ? "g" : "r";
       el("dTs").textContent = d.ts_hkt || d.ts || "—";
+      const ban = (d.suggested_exits_meta && d.suggested_exits_meta.banner) || null;
+      if (ban && el("deskExitBanner")) el("deskExitBanner").textContent = ban;
       const sot = d.sot || {};
       el("deskSot").innerHTML = `own=${sot.entry_own_narrative || "—"} · majors=${sot.entry_majors || "—"} · SL=${sot.sl || "—"} · TP=${sot.tp || "—"} · size=${sot.size_pct || "—"}% · lev=${sot.leverage || "—"}`;
       const pos = d.positions || [];
@@ -1357,14 +1495,19 @@
     });
   });
 
-  document.querySelector(".right-tabs").addEventListener("click", (ev) => {
-    const btn = ev.target.closest("button[data-rtab]");
-    if (!btn) return;
-    rightTab = btn.dataset.rtab;
-    document.querySelectorAll(".right-tabs button").forEach((b) => b.classList.toggle("active", b === btn));
-    el("rtabActions").classList.toggle("hidden", rightTab !== "actions");
-    el("rtabPositions").classList.toggle("hidden", rightTab !== "positions");
-  });
+  const rightTabs = document.querySelector(".right-tabs");
+  if (rightTabs) {
+    rightTabs.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("button[data-rtab]");
+      if (!btn) return;
+      rightTab = btn.dataset.rtab;
+      rightTabs.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
+      const act = el("rtabActions");
+      const pos = el("rtabPositions");
+      if (act) act.classList.toggle("hidden", rightTab !== "actions");
+      if (pos) pos.classList.toggle("hidden", rightTab !== "positions");
+    });
+  }
 
   // live clock
   function tickClock() {

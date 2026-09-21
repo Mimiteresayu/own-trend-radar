@@ -2,12 +2,13 @@
 """Observe-only suggested exits for open HL positions. NEVER places/cancels/modifies orders.
 
 For each open position computes four exit levels:
-  h1   — 1H GC Filter
-  h4   — 4H GC Filter
+  h1   — 1H GC Lower (period 48)  — observe: cross below lower channel
+  h4   — 4H GC Filter (period 72) — observe: cross below mid/filter
   nbar — min(low of last N fully closed 4H bars)  [SHORT: max high]
   mom  — 4H Upper (structure / 止贏); label mom_4h_upper
 
 Optional: mom_fail_1h_filter (1H Filter) when mid > entry (long hint).
+Chart note 2026-09-21 TRX n=1: 4H=Filter mid; 1H=Lower (not mid).
 """
 from __future__ import annotations
 
@@ -36,6 +37,9 @@ CFG = ROOT / "hl_monitor_config.json"
 WALLET_DEFAULT = "0xcFCda0F8576a268BaA17935368081F4e687dB122"
 NBAR_N = 2
 NBAR_TF = "4h"
+# LTF GC periods (TV lock 2026-09-21): 1D=144, 4H=72, 1H=48
+PERIOD_H4 = 72
+PERIOD_H1 = 48
 HKT = timezone(timedelta(hours=8))
 
 
@@ -74,7 +78,7 @@ def exit_metrics(exit_px: float, entry: float, sz: float, side: str) -> Dict[str
 
 
 def closed_gc_levels(bars: List[dict], period: int = GC_PERIOD) -> Optional[Dict[str, Any]]:
-    """Last fully closed bar GC filter/upper (bars[-1] treated as forming)."""
+    """Last fully closed bar GC filter/upper/lower (bars[-1] treated as forming)."""
     min_bars = period + 20
     if len(bars) < min_bars:
         return None
@@ -88,6 +92,7 @@ def closed_gc_levels(bars: List[dict], period: int = GC_PERIOD) -> Optional[Dict
     return {
         "filter": float(gc[i]["filter"]),
         "upper": float(gc[i]["upper"]),
+        "lower": float(gc[i]["lower"]),
         "close": float(c[i]),
         "bar_t": int(bars[i]["t"]),
         "i": i,
@@ -224,21 +229,21 @@ def compute_for_position(p: dict) -> dict:
     mid = p.get("mid")
     mid_f = float(mid) if mid is not None else None
 
-    # 4H candles once → filter, upper, nbar
+    # 4H candles once → filter (72), upper, nbar
     bars4 = fetch_candles(coin, "4h")
-    gc4 = closed_gc_levels(bars4, period=GC_PERIOD)
+    gc4 = closed_gc_levels(bars4, period=PERIOD_H4)
     nb = nbar_level(bars4, NBAR_N, side)
 
-    # 1H candles → filter
+    # 1H candles → lower (48) for exit observe
     bars1 = fetch_candles(coin, "1h")
-    gc1 = closed_gc_levels(bars1, period=GC_PERIOD)
+    gc1 = closed_gc_levels(bars1, period=PERIOD_H1)
 
     exits: Dict[str, Any] = {}
     err: Dict[str, str] = {}
 
     if gc1:
-        m = exit_metrics(gc1["filter"], entry, sz, side)
-        m["label"] = "1h_filter"
+        m = exit_metrics(gc1["lower"], entry, sz, side)
+        m["label"] = "1h_lower"
         m["bar_utc"] = datetime.fromtimestamp(gc1["bar_t"] / 1000, tz=timezone.utc).isoformat()
         exits["h1"] = m
     else:
@@ -328,7 +333,7 @@ def patch_desk(suggested: dict) -> None:
         "ts_hkt": suggested.get("ts_hkt"),
         "params": suggested.get("params"),
         "observe_only": True,
-        "banner": "suggested only — no order changes",
+        "banner": "suggested only — 1H=Lower(48) · 4H=Filter(72) — no orders",
     }
     DESK.write_text(json.dumps(d, indent=2), encoding="utf-8")
     print(f"patched {DESK}")
@@ -374,15 +379,16 @@ def main() -> int:
         "ts": datetime.now(timezone.utc).isoformat(),
         "ts_hkt": _ts_hkt(),
         "observe_only": True,
-        "banner": "suggested only — no order changes",
+        "banner": "suggested only — 1H=Lower(48) · 4H=Filter(72) — no orders",
         "wallet": addr[:6] + "…" + addr[-4:],
         "params": {
             "n": NBAR_N,
             "nbar_tf": NBAR_TF,
             "mom": "4h_upper",
-            "gc": f"hlc3/4/{GC_PERIOD}/1.414 lag=0 fast=0",
-            "h1": "1h_filter",
-            "h4": "4h_filter",
+            "gc_1d_entry": f"hlc3/4/{GC_PERIOD}/1.414 lag=0 fast=0",
+            "h1": f"1h_lower period={PERIOD_H1}",
+            "h4": f"4h_filter period={PERIOD_H4}",
+            "note": "observe TRX n=1: 4H=Filter mid; 1H=Lower",
         },
         "positions": rows,
     }

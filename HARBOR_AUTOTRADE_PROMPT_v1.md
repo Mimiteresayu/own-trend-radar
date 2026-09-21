@@ -3,7 +3,8 @@
 Signum TR-GC-Crypto-LS-15 **base** + Own mods. Harbor **auto 落單** under this prompt (no per-trade ask unless stop conditions).
 
 ## GC
-- hlc3 / poles 4 / period 144 / mult 1.414
+- hlc3 / poles 4 / mult 1.414
+- **Period by TF (2026-09-21 lock):** **1D = 144** (entry) · **4H = 72** (SL / Upper-loss) · **1H = 48** (observe)
 - **Reduced Lag: OFF · Fast Response: OFF** (user lock; author ON/OFF to re-verify later)
 - Decisions on **closed bars only**
 
@@ -21,7 +22,7 @@ Signum TR-GC-Crypto-LS-15 **base** + Own mods. Harbor **auto 落單** under this
 - Leverage **1–5x** by confluence layers (cap 5): GC signal, narrative hit, BTC regime Green, breadth≥60%, other locked factors
 - Skip notional &lt; $10
 - Before order: check **liquidation**; abort/report if liq too close (&lt;~8% from mid) or missing dangerously
-- Hard **SL = 4H Filter** (middle line); refresh SL on 4H desk when Filter moves materially
+- Hard **SL = 4H Filter** (middle line, **period 72**); refresh SL on 4H desk when Filter moves materially
 - **No fixed % TP**
 
 ## Long exit (Signum Upper-loss spirit → H4)
