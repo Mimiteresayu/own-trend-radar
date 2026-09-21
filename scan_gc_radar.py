@@ -646,6 +646,31 @@ def compute_vol_momentum(bars: List[dict], i: int, lookback: int = RVOL_LOOKBACK
     }
 
 
+def classify_upper_status(
+    open_: float,
+    high: float,
+    close: float,
+    upper: float,
+    prev_close: float,
+    prev_upper: float,
+) -> str:
+    """Early-entry watch vs GC Upper (observe only; does NOT change dual_cross SoT).
+
+    Labels (single): below | wick | open | close | upper
+    Priority: riding/cross first, then open-above, wick, else below.
+    """
+    if close > upper and prev_close > prev_upper:
+        return "upper"
+    if close > upper and prev_close <= prev_upper:
+        return "close"
+    # close back at/below Upper
+    if open_ >= upper:
+        return "open"
+    if high >= upper:
+        return "wick"
+    return "below"
+
+
 def scan_symbol(coin: str, tf: str, ctx: Optional[Dict[str, Any]] = None) -> Optional[dict]:
     period = gc_period_for_tf(tf)
     bars = fetch_candles(coin, tf)
@@ -661,10 +686,11 @@ def scan_symbol(coin: str, tf: str, ctx: Optional[Dict[str, Any]] = None) -> Opt
     lows = [b["low"] for b in bars]
     closes = [b["close"] for b in bars]
     gc = compute_gc(highs, lows, closes, period=period)
-    # Use latest CLOSED daily/TF bar only (avoid showing yesterday's cross as "today")
+    # Use latest CLOSED daily/TF bar only for dual_cross SoT (avoid forming-bar false entries)
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     bar_ms = TF_CONFIG[tf]["bar_ms"]
-    i = len(gc) - 1
+    live_i = len(gc) - 1  # may be incomplete/forming HL candle
+    i = live_i
     while i >= 1 and bars[i]["t"] + bar_ms > now_ms:
         i -= 1
     if i < 1:
@@ -678,11 +704,26 @@ def scan_symbol(coin: str, tf: str, ctx: Optional[Dict[str, Any]] = None) -> Opt
     close = closes[i]
     prev_close = closes[i - 1]
 
-    # --- GC entry flags (LOCKED — do not change dual_cross math) ---
+    # --- GC entry flags (LOCKED — do not change dual_cross math; closed bar only) ---
     trend = "Green" if filt > prev_filt else "Red"
     above_upper = close > upper
     dual_cross_up = close > upper and prev_close <= prev_upper
     dual_cross_down_filter = close < filt and prev_close >= prev_filt
+
+    # Early-entry status: prefer forming/incomplete candle when HL returns one
+    # (status only — Base entry remains closed-bar dual_cross_up).
+    si = live_i if live_i >= 1 else i
+    if si < 1:
+        si = i
+    s_upper = gc[si]["upper"]
+    s_prev_upper = gc[si - 1]["upper"] if si >= 1 else prev_upper
+    s_close = closes[si]
+    s_prev_close = closes[si - 1] if si >= 1 else prev_close
+    s_open = float(bars[si].get("open") or s_close)
+    s_high = float(bars[si].get("high") or max(s_open, s_close))
+    upper_status = classify_upper_status(
+        s_open, s_high, s_close, s_upper, s_prev_close, s_prev_upper
+    )
     last_cross_up_at = None
     for j in range(i, 0, -1):
         if closes[j - 1] <= gc[j - 1]["upper"] and closes[j] > gc[j]["upper"]:
@@ -717,6 +758,7 @@ def scan_symbol(coin: str, tf: str, ctx: Optional[Dict[str, Any]] = None) -> Opt
         "above_upper": above_upper,
         "dual_cross_up": dual_cross_up,
         "dual_cross_down_filter": dual_cross_down_filter,
+        "upper_status": upper_status,
         "ath": round(ath, 8),
         "atl": round(atl, 8),
         "drop_from_ath_pct": drop_from_ath_pct,
@@ -747,6 +789,7 @@ CSV_FIELDS = [
     "above_upper",
     "dual_cross_up",
     "dual_cross_down_filter",
+    "upper_status",
     "ath",
     "atl",
     "drop_from_ath_pct",
@@ -815,6 +858,12 @@ def scan_tf(
     rank_map = {r["symbol"]: i + 1 for i, r in enumerate(by_mom)}
     for r in rows:
         r["mom_rank"] = rank_map.get(r["symbol"])
+
+    # Size tier (mcap) + category sleeve (Narrative / Cemetery / Price)
+    narr = load_narrative_tickers()
+    mcap_map = load_mcap_map() if load_mcap_map else {}
+    for r in rows:
+        enrich_row_tier_category(r, narr, mcap_map)
 
     # Display/candidate priority: dual_cross_up first, then mom_score, then symbol.
     # Does NOT change which rows get dual_cross_up=true (GC only).

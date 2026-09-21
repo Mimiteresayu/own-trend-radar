@@ -73,3 +73,19 @@ Each radar row includes:
 | `categories` | Optional multi-label array |
 
 UI Radar table shows sortable **tier** and **category** columns.
+
+
+## Early-entry `upper_status` (observe only)
+
+Vs GC Upper on the **latest bar** (prefers HL incomplete/forming candle when present).
+Base entry SoT unchanged: closed-bar `dual_cross_up` only.
+
+| Label | Meaning |
+|-------|---------|
+| `below` | high < Upper |
+| `wick` | high ≥ Upper, close ≤ Upper |
+| `open` | open ≥ Upper, close ≤ Upper |
+| `close` | close > Upper, prior close ≤ prior Upper (forming/closed cross) |
+| `upper` | close > Upper, prior close already above (riding) |
+
+4H often shows more `dual_cross_up` than 1D when names have been `above_upper` multi-day on daily — expected.

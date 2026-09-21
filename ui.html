@@ -423,6 +423,11 @@
   .cat-Narrative { color: #c9a0ff; }
   .cat-Cemetery { color: #e3a857; }
   .cat-Price { color: var(--muted); }
+  .us-below { color: var(--muted); }
+  .us-wick { color: #e3a857; }
+  .us-open { color: #79b8ff; }
+  .us-close { color: #3fb950; font-weight: 600; }
+  .us-upper { color: #7ee787; }
 
   /* ——— Radar / shared table styles ——— */
   .tf-tabs, .filters {
@@ -769,6 +774,7 @@
             <th data-k="lower">lower <span class="arrow">↕</span></th>
             <th data-k="above_upper">above_upper <span class="arrow">↕</span></th>
             <th data-k="dual_cross_up">dual_cross_up <span class="arrow">↕</span></th>
+            <th data-k="upper_status">upper_status <span class="arrow">↕</span></th>
             <th data-k="dual_cross_down_filter">dual_cross_down_filter <span class="arrow">↕</span></th>
             <th data-k="drop_from_ath_pct">↓ from ATH% <span class="arrow">↕</span></th>
             <th data-k="from_atl_pct">↑ from ATL% <span class="arrow">↕</span></th>
@@ -1284,6 +1290,7 @@
         <td>${fmtNum(r.lower)}</td>
         <td>${boolCell(r.above_upper)}</td>
         <td>${boolCell(r.dual_cross_up)}</td>
+        <td class="us-${(r.upper_status || "below")}">${r.upper_status || "—"}</td>
         <td>${boolCell(r.dual_cross_down_filter, true)}</td>
         <td>${r.drop_from_ath_pct != null ? r.drop_from_ath_pct.toFixed(1) + "%" : "—"}</td>
         <td>${r.from_atl_pct != null ? r.from_atl_pct.toFixed(1) + "%" : "—"}</td>
