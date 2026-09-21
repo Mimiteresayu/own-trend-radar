@@ -1,0 +1,709 @@
+{
+  "ts": "2026-09-12T07:16:41.417558+00:00",
+  "source": "hyperliquid metaAndAssetCtxs dayNtlVlm",
+  "perp_tradable": 178,
+  "top100": [
+    {
+      "rank": 1,
+      "symbol": "BTC",
+      "dayNtlVlm": 3588806051.3552685,
+      "openInterest": 35941.84478,
+      "markPx": 77283.0
+    },
+    {
+      "rank": 2,
+      "symbol": "ETH",
+      "dayNtlVlm": 2610653447.562537,
+      "openInterest": 978817.4976000001,
+      "markPx": 2521.58
+    },
+    {
+      "rank": 3,
+      "symbol": "HYPE",
+      "dayNtlVlm": 588531032.9634895,
+      "openInterest": 21148048.440000013,
+      "markPx": 78.854
+    },
+    {
+      "rank": 4,
+      "symbol": "ZEC",
+      "dayNtlVlm": 506734436.65899956,
+      "openInterest": 472996.32,
+      "markPx": 1142.9611
+    },
+    {
+      "rank": 5,
+      "symbol": "SOL",
+      "dayNtlVlm": 311607073.04511994,
+      "openInterest": 5341733.839999996,
+      "markPx": 101.72
+    },
+    {
+      "rank": 6,
+      "symbol": "XRP",
+      "dayNtlVlm": 102365271.85119998,
+      "openInterest": 158614496.0,
+      "markPx": 1.3645
+    },
+    {
+      "rank": 7,
+      "symbol": "NEAR",
+      "dayNtlVlm": 76217924.95958,
+      "openInterest": 62734652.6,
+      "markPx": 2.3629
+    },
+    {
+      "rank": 8,
+      "symbol": "PUMP",
+      "dayNtlVlm": 74935285.487213,
+      "openInterest": 41349331762.0,
+      "markPx": 0.003571
+    },
+    {
+      "rank": 9,
+      "symbol": "PONS",
+      "dayNtlVlm": 56498751.07341001,
+      "openInterest": 137725352.0,
+      "markPx": 0.625507
+    },
+    {
+      "rank": 10,
+      "symbol": "LIT",
+      "dayNtlVlm": 52320247.01439998,
+      "openInterest": 40452426.0,
+      "markPx": 4.3669
+    },
+    {
+      "rank": 11,
+      "symbol": "VVV",
+      "dayNtlVlm": 33799321.39559003,
+      "openInterest": 2297181.0399999996,
+      "markPx": 23.891
+    },
+    {
+      "rank": 12,
+      "symbol": "LINK",
+      "dayNtlVlm": 33020880.12999999,
+      "openInterest": 6375959.0,
+      "markPx": 11.543
+    },
+    {
+      "rank": 13,
+      "symbol": "UNI",
+      "dayNtlVlm": 30603408.00483,
+      "openInterest": 7405827.6,
+      "markPx": 6.2959
+    },
+    {
+      "rank": 14,
+      "symbol": "ENA",
+      "dayNtlVlm": 26795241.958160017,
+      "openInterest": 321146680.0,
+      "markPx": 0.14188
+    },
+    {
+      "rank": 15,
+      "symbol": "CASHCAT",
+      "dayNtlVlm": 23762535.10408999,
+      "openInterest": 254974916.0,
+      "markPx": 0.17326
+    },
+    {
+      "rank": 16,
+      "symbol": "ETHFI",
+      "dayNtlVlm": 19788976.627112005,
+      "openInterest": 35672700.6,
+      "markPx": 0.72876
+    },
+    {
+      "rank": 17,
+      "symbol": "XMR",
+      "dayNtlVlm": 19093592.830700003,
+      "openInterest": 141007.1680000002,
+      "markPx": 541.36
+    },
+    {
+      "rank": 18,
+      "symbol": "ARB",
+      "dayNtlVlm": 15978910.379649004,
+      "openInterest": 108803742.19999997,
+      "markPx": 0.14356
+    },
+    {
+      "rank": 19,
+      "symbol": "DOGE",
+      "dayNtlVlm": 15568076.027590003,
+      "openInterest": 829744318.0,
+      "markPx": 0.084549
+    },
+    {
+      "rank": 20,
+      "symbol": "TAO",
+      "dayNtlVlm": 14974474.24824,
+      "openInterest": 168838.932,
+      "markPx": 235.21
+    },
+    {
+      "rank": 21,
+      "symbol": "XPL",
+      "dayNtlVlm": 14953770.487499995,
+      "openInterest": 519514786.0,
+      "markPx": 0.083966
+    },
+    {
+      "rank": 22,
+      "symbol": "FARTCOIN",
+      "dayNtlVlm": 13808563.221568001,
+      "openInterest": 188416246.79999998,
+      "markPx": 0.14509
+    },
+    {
+      "rank": 23,
+      "symbol": "SUI",
+      "dayNtlVlm": 12261086.400364004,
+      "openInterest": 42682227.4,
+      "markPx": 0.72607
+    },
+    {
+      "rank": 24,
+      "symbol": "kPEPE",
+      "dayNtlVlm": 11609758.315930001,
+      "openInterest": 6183271620.0,
+      "markPx": 0.003333
+    },
+    {
+      "rank": 25,
+      "symbol": "BNB",
+      "dayNtlVlm": 11442696.817409996,
+      "openInterest": 61030.062,
+      "markPx": 733.2
+    },
+    {
+      "rank": 26,
+      "symbol": "WLD",
+      "dayNtlVlm": 11343664.136612015,
+      "openInterest": 101849944.8,
+      "markPx": 0.4027
+    },
+    {
+      "rank": 27,
+      "symbol": "MET",
+      "dayNtlVlm": 9750021.586360006,
+      "openInterest": 14434494.0,
+      "markPx": 0.224885
+    },
+    {
+      "rank": 28,
+      "symbol": "AVAX",
+      "dayNtlVlm": 9550875.346824996,
+      "openInterest": 2206916.32,
+      "markPx": 7.4449
+    },
+    {
+      "rank": 29,
+      "symbol": "USELESS",
+      "dayNtlVlm": 9420626.253989998,
+      "openInterest": 25281140.0,
+      "markPx": 0.22753
+    },
+    {
+      "rank": 30,
+      "symbol": "CRV",
+      "dayNtlVlm": 7593194.740994999,
+      "openInterest": 49983614.0,
+      "markPx": 0.3362
+    },
+    {
+      "rank": 31,
+      "symbol": "ADA",
+      "dayNtlVlm": 6948373.09448,
+      "openInterest": 160886224.0,
+      "markPx": 0.20823
+    },
+    {
+      "rank": 32,
+      "symbol": "AAVE",
+      "dayNtlVlm": 6242204.962900003,
+      "openInterest": 597676.1,
+      "markPx": 126.22
+    },
+    {
+      "rank": 33,
+      "symbol": "JUP",
+      "dayNtlVlm": 5927524.372159993,
+      "openInterest": 44167268.0,
+      "markPx": 0.24621
+    },
+    {
+      "rank": 34,
+      "symbol": "TRUMP",
+      "dayNtlVlm": 5917078.464209999,
+      "openInterest": 6217366.600000001,
+      "markPx": 1.9964
+    },
+    {
+      "rank": 35,
+      "symbol": "ONDO",
+      "dayNtlVlm": 5832783.13923,
+      "openInterest": 66570008.0,
+      "markPx": 0.35104
+    },
+    {
+      "rank": 36,
+      "symbol": "SPX",
+      "dayNtlVlm": 5528952.142175003,
+      "openInterest": 11861617.8,
+      "markPx": 0.49466
+    },
+    {
+      "rank": 37,
+      "symbol": "MON",
+      "dayNtlVlm": 5255923.882555001,
+      "openInterest": 1327179982.0,
+      "markPx": 0.023621
+    },
+    {
+      "rank": 38,
+      "symbol": "AERO",
+      "dayNtlVlm": 4484075.43066,
+      "openInterest": 30053322.0,
+      "markPx": 0.58001
+    },
+    {
+      "rank": 39,
+      "symbol": "LTC",
+      "dayNtlVlm": 4382469.452659998,
+      "openInterest": 454785.22,
+      "markPx": 53.931
+    },
+    {
+      "rank": 40,
+      "symbol": "WLFI",
+      "dayNtlVlm": 4068360.3604220003,
+      "openInterest": 202535770.0,
+      "markPx": 0.056154
+    },
+    {
+      "rank": 41,
+      "symbol": "CHIP",
+      "dayNtlVlm": 3837120.1513169985,
+      "openInterest": 248416830.0,
+      "markPx": 0.047543
+    },
+    {
+      "rank": 42,
+      "symbol": "ASTER",
+      "dayNtlVlm": 3605474.0403299993,
+      "openInterest": 35694916.0,
+      "markPx": 0.68472
+    },
+    {
+      "rank": 43,
+      "symbol": "INJ",
+      "dayNtlVlm": 3482832.369829999,
+      "openInterest": 3608339.2,
+      "markPx": 5.9251
+    },
+    {
+      "rank": 44,
+      "symbol": "DOT",
+      "dayNtlVlm": 3451051.2893,
+      "openInterest": 5033180.8,
+      "markPx": 1.0507
+    },
+    {
+      "rank": 45,
+      "symbol": "BCH",
+      "dayNtlVlm": 3235948.165209998,
+      "openInterest": 21739.762,
+      "markPx": 230.79
+    },
+    {
+      "rank": 46,
+      "symbol": "MORPHO",
+      "dayNtlVlm": 2983409.736730002,
+      "openInterest": 2332278.2,
+      "markPx": 2.294
+    },
+    {
+      "rank": 47,
+      "symbol": "PENGU",
+      "dayNtlVlm": 2916614.475314,
+      "openInterest": 914180482.0,
+      "markPx": 0.007264
+    },
+    {
+      "rank": 48,
+      "symbol": "DASH",
+      "dayNtlVlm": 2780624.892469999,
+      "openInterest": 99925.56,
+      "markPx": 56.918
+    },
+    {
+      "rank": 49,
+      "symbol": "TRX",
+      "dayNtlVlm": 2496098.086849999,
+      "openInterest": 42636184.0,
+      "markPx": 0.338663
+    },
+    {
+      "rank": 50,
+      "symbol": "PENDLE",
+      "dayNtlVlm": 2477615.7463,
+      "openInterest": 4618616.0,
+      "markPx": 2.1149
+    },
+    {
+      "rank": 51,
+      "symbol": "APT",
+      "dayNtlVlm": 2464668.9007129995,
+      "openInterest": 5479204.999999999,
+      "markPx": 0.6105
+    },
+    {
+      "rank": 52,
+      "symbol": "FET",
+      "dayNtlVlm": 2210256.69498,
+      "openInterest": 40828260.0,
+      "markPx": 0.16994
+    },
+    {
+      "rank": 53,
+      "symbol": "VIRTUAL",
+      "dayNtlVlm": 2088156.9811459996,
+      "openInterest": 14214460.6,
+      "markPx": 0.64015
+    },
+    {
+      "rank": 54,
+      "symbol": "ATOM",
+      "dayNtlVlm": 2017565.4316840004,
+      "openInterest": 1704615.96,
+      "markPx": 1.6505
+    },
+    {
+      "rank": 55,
+      "symbol": "PAXG",
+      "dayNtlVlm": 1905292.2528000004,
+      "openInterest": 5276.7,
+      "markPx": 4354.8
+    },
+    {
+      "rank": 56,
+      "symbol": "MINA",
+      "dayNtlVlm": 1730133.0885819998,
+      "openInterest": 38434076.0,
+      "markPx": 0.10886
+    },
+    {
+      "rank": 57,
+      "symbol": "XLM",
+      "dayNtlVlm": 1582971.315,
+      "openInterest": 56313818.0,
+      "markPx": 0.17985
+    },
+    {
+      "rank": 58,
+      "symbol": "BLUR",
+      "dayNtlVlm": 1521152.0141509993,
+      "openInterest": 64215404.0,
+      "markPx": 0.017065
+    },
+    {
+      "rank": 59,
+      "symbol": "ZRO",
+      "dayNtlVlm": 1394279.2906089996,
+      "openInterest": 35314540.400000006,
+      "markPx": 0.996
+    },
+    {
+      "rank": 60,
+      "symbol": "STRK",
+      "dayNtlVlm": 1390799.0871559994,
+      "openInterest": 188590850.8,
+      "markPx": 0.02919
+    },
+    {
+      "rank": 61,
+      "symbol": "ALGO",
+      "dayNtlVlm": 1384391.5181169994,
+      "openInterest": 25211482.0,
+      "markPx": 0.093676
+    },
+    {
+      "rank": 62,
+      "symbol": "HBAR",
+      "dayNtlVlm": 1361429.7946539999,
+      "openInterest": 74318972.0,
+      "markPx": 0.074372
+    },
+    {
+      "rank": 63,
+      "symbol": "ZEN",
+      "dayNtlVlm": 1285408.2010420002,
+      "openInterest": 354555.0,
+      "markPx": 6.4724
+    },
+    {
+      "rank": 64,
+      "symbol": "SKR",
+      "dayNtlVlm": 1269979.851921,
+      "openInterest": 114067544.0,
+      "markPx": 0.019057
+    },
+    {
+      "rank": 65,
+      "symbol": "ICP",
+      "dayNtlVlm": 1268041.1453900002,
+      "openInterest": 1195179.5999999999,
+      "markPx": 2.782
+    },
+    {
+      "rank": 66,
+      "symbol": "PURR",
+      "dayNtlVlm": 1252732.6722300006,
+      "openInterest": 101084892.0,
+      "markPx": 0.10976
+    },
+    {
+      "rank": 67,
+      "symbol": "SKY",
+      "dayNtlVlm": 1245219.0914769992,
+      "openInterest": 38795294.0,
+      "markPx": 0.063178
+    },
+    {
+      "rank": 68,
+      "symbol": "TIA",
+      "dayNtlVlm": 1233032.2390319996,
+      "openInterest": 6818976.8,
+      "markPx": 0.35996
+    },
+    {
+      "rank": 69,
+      "symbol": "kBONK",
+      "dayNtlVlm": 1230990.0073189999,
+      "openInterest": 2030248114.0,
+      "markPx": 0.002805
+    },
+    {
+      "rank": 70,
+      "symbol": "ETC",
+      "dayNtlVlm": 1195425.910468999,
+      "openInterest": 284393.4,
+      "markPx": 7.7355
+    },
+    {
+      "rank": 71,
+      "symbol": "JTO",
+      "dayNtlVlm": 1149509.7129199994,
+      "openInterest": 10335468.0,
+      "markPx": 0.43626
+    },
+    {
+      "rank": 72,
+      "symbol": "CC",
+      "dayNtlVlm": 1127202.4814849999,
+      "openInterest": 44899834.0,
+      "markPx": 0.098967
+    },
+    {
+      "rank": 73,
+      "symbol": "POL",
+      "dayNtlVlm": 1074916.7568540003,
+      "openInterest": 37125680.0,
+      "markPx": 0.096332
+    },
+    {
+      "rank": 74,
+      "symbol": "GRASS",
+      "dayNtlVlm": 1012226.590189,
+      "openInterest": 36287957.2,
+      "markPx": 0.33263
+    },
+    {
+      "rank": 75,
+      "symbol": "LDO",
+      "dayNtlVlm": 993894.2851649998,
+      "openInterest": 27773532.0,
+      "markPx": 0.37856
+    },
+    {
+      "rank": 76,
+      "symbol": "GRAM",
+      "dayNtlVlm": 876019.3866000007,
+      "openInterest": 20798272.0,
+      "markPx": 1.370145
+    },
+    {
+      "rank": 77,
+      "symbol": "SYRUP",
+      "dayNtlVlm": 867761.0659399999,
+      "openInterest": 17390106.0,
+      "markPx": 0.21906
+    },
+    {
+      "rank": 78,
+      "symbol": "FIL",
+      "dayNtlVlm": 815897.6239600006,
+      "openInterest": 4732324.600000001,
+      "markPx": 0.8089
+    },
+    {
+      "rank": 79,
+      "symbol": "SOPH",
+      "dayNtlVlm": 812533.7717579996,
+      "openInterest": 174585372.0,
+      "markPx": 0.004669
+    },
+    {
+      "rank": 80,
+      "symbol": "SEI",
+      "dayNtlVlm": 777557.2705799998,
+      "openInterest": 43011934.0,
+      "markPx": 0.044784
+    },
+    {
+      "rank": 81,
+      "symbol": "OP",
+      "dayNtlVlm": 774826.124346,
+      "openInterest": 34671928.8,
+      "markPx": 0.09654
+    },
+    {
+      "rank": 82,
+      "symbol": "RENDER",
+      "dayNtlVlm": 741997.2834099995,
+      "openInterest": 1127511.8,
+      "markPx": 1.3951
+    },
+    {
+      "rank": 83,
+      "symbol": "REZ",
+      "dayNtlVlm": 740292.8491480007,
+      "openInterest": 204943304.0,
+      "markPx": 0.003222
+    },
+    {
+      "rank": 84,
+      "symbol": "EIGEN",
+      "dayNtlVlm": 736192.1521950004,
+      "openInterest": 12990654.82,
+      "markPx": 0.2168
+    },
+    {
+      "rank": 85,
+      "symbol": "BERA",
+      "dayNtlVlm": 517431.4272329999,
+      "openInterest": 9520448.200000001,
+      "markPx": 0.19083
+    },
+    {
+      "rank": 86,
+      "symbol": "WIF",
+      "dayNtlVlm": 502749.98042,
+      "openInterest": 24177282.0,
+      "markPx": 0.19467
+    },
+    {
+      "rank": 87,
+      "symbol": "GALA",
+      "dayNtlVlm": 485217.151104,
+      "openInterest": 273774514.0,
+      "markPx": 0.001705
+    },
+    {
+      "rank": 88,
+      "symbol": "kSHIB",
+      "dayNtlVlm": 478261.8931369999,
+      "openInterest": 541258900.0,
+      "markPx": 0.005231
+    },
+    {
+      "rank": 89,
+      "symbol": "KAS",
+      "dayNtlVlm": 469306.7262989997,
+      "openInterest": 67366398.0,
+      "markPx": 0.035371
+    },
+    {
+      "rank": 90,
+      "symbol": "KAITO",
+      "dayNtlVlm": 461262.1111200001,
+      "openInterest": 6224800.0,
+      "markPx": 0.3119
+    },
+    {
+      "rank": 91,
+      "symbol": "CAKE",
+      "dayNtlVlm": 445711.7230000001,
+      "openInterest": 1136590.4000000001,
+      "markPx": 2.2236
+    },
+    {
+      "rank": 92,
+      "symbol": "HEMI",
+      "dayNtlVlm": 443124.854779,
+      "openInterest": 176841412.0,
+      "markPx": 0.006821
+    },
+    {
+      "rank": 93,
+      "symbol": "MEGA",
+      "dayNtlVlm": 437432.7413169999,
+      "openInterest": 107108366.0,
+      "markPx": 0.037632
+    },
+    {
+      "rank": 94,
+      "symbol": "STX",
+      "dayNtlVlm": 414219.019995,
+      "openInterest": 4319640.399999999,
+      "markPx": 0.2648
+    },
+    {
+      "rank": 95,
+      "symbol": "MNT",
+      "dayNtlVlm": 398464.086527,
+      "openInterest": 9913932.0,
+      "markPx": 0.57334
+    },
+    {
+      "rank": 96,
+      "symbol": "ENS",
+      "dayNtlVlm": 338842.3392480002,
+      "openInterest": 457862.54,
+      "markPx": 5.7929
+    },
+    {
+      "rank": 97,
+      "symbol": "W",
+      "dayNtlVlm": 337063.2501419999,
+      "openInterest": 155441851.20000002,
+      "markPx": 0.00983
+    },
+    {
+      "rank": 98,
+      "symbol": "SAGA",
+      "dayNtlVlm": 334861.2014919998,
+      "openInterest": 74736330.2,
+      "markPx": 0.01641
+    },
+    {
+      "rank": 99,
+      "symbol": "ZK",
+      "dayNtlVlm": 333926.453181,
+      "openInterest": 52618210.0,
+      "markPx": 0.009681
+    },
+    {
+      "rank": 100,
+      "symbol": "ACE",
+      "dayNtlVlm": 322066.097667,
+      "openInterest": 3523246.42,
+      "markPx": 0.1625
+    }
+  ],
+  "btc_rank": 1,
+  "eth_rank": 2
+}

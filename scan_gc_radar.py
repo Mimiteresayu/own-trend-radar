@@ -38,8 +38,31 @@ except ImportError:  # pragma: no cover
 # ---------------------------------------------------------------------------
 ROOT = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(ROOT, "out")
-CANDIDATES_PATH = "/workspace/own_radar_candidates_base_v0.json"
 HL_INFO = "https://api.hyperliquid.xyz/info"
+
+
+def _resolve_data_file(*candidates: str) -> str:
+    """First existing path among candidates (abs or relative to ROOT)."""
+    for c in candidates:
+        path = c if os.path.isabs(c) else os.path.join(ROOT, c)
+        if os.path.isfile(path):
+            return path
+    # Prefer first candidate as default (may be missing; loaders handle that)
+    c0 = candidates[0]
+    return c0 if os.path.isabs(c0) else os.path.join(ROOT, c0)
+
+
+# Optional secondary filter + volume fallback (baked under data/ for Railway)
+CANDIDATES_PATH = _resolve_data_file(
+    "data/own_radar_candidates_base_v0.json",
+    "own_radar_candidates_base_v0.json",
+    "/workspace/own_radar_candidates_base_v0.json",
+)
+HL_VOLUME_JSON = _resolve_data_file(
+    "data/hl_volume_top100.json",
+    "hl_volume_top100.json",
+    "/workspace/hl_volume_top100.json",
+)
 
 MAX_SYMBOLS = 280  # expanded liquid HL universe (~250–300; --max overrides)
 # Universe liquidity floor: dayNtlVlm >= $75k (between $50k–$100k).
@@ -49,7 +72,6 @@ REQUIRE_OI_POSITIVE = True  # soft floor when OI present in assetCtxs
 RVOL_LOOKBACK = 14  # closed days prior used for median volume (RVOL)
 CONCURRENCY = 2  # polite; scanning ~280×TFs is heavy
 REQUEST_PAUSE_S = 0.35  # polite rate limit between requests in a worker
-HL_VOLUME_JSON = "/workspace/hl_volume_top100.json"
 
 GC_POLES = 4
 GC_PERIOD = 144

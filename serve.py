@@ -2,7 +2,7 @@
 """Own Trend Radar UI — local :8787 or Railway (PORT, COCKPIT_PASSWORD).
 
 Local:  python serve.py  → http://127.0.0.1:8787/  (no password unless set)
-Railway: password gate + POST /api/sync; /api/rescan disabled when RAILWAY=1
+Railway: password gate + POST /api/sync; background scanner writes out/gc_radar_*.json
 """
 from __future__ import annotations
 
@@ -14,6 +14,9 @@ import os
 import secrets
 import subprocess
 import sys
+import threading
+import time
+from datetime import datetime, timezone
 from http.cookies import SimpleCookie
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -23,11 +26,19 @@ PORT = int(os.environ.get("PORT") or "8787")
 HOST = os.environ.get("HOST") or ("0.0.0.0" if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY") else "0.0.0.0")
 SCAN_SCRIPT = os.path.join(ROOT, "scan_gc_radar.py")
 UI_PATH = os.path.join(ROOT, "ui.html")
+OUT_DIR = os.path.join(ROOT, "out")
 RESCAN_TIMEOUT_S = 1800
 PASSWORD = (os.environ.get("COCKPIT_PASSWORD") or "").strip()
 ON_RAILWAY = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY"))
 COOKIE_NAME = "otr_session"
 SESSION_SECRET = (os.environ.get("SESSION_SECRET") or PASSWORD or "dev-local").encode()
+# Scheduler (Railway): UTC :05 after bar close. HKT = UTC+8.
+SCHEDULER_ENABLE = (os.environ.get("OTR_SCHEDULER") or ("1" if ON_RAILWAY else "0")).strip() in ("1", "true", "yes")
+SCAN_MAX = int(os.environ.get("OTR_SCAN_MAX") or "280")
+SCAN_MAX_1H = int(os.environ.get("OTR_SCAN_MAX_1H") or "200")
+SCAN_CONCURRENCY = int(os.environ.get("OTR_SCAN_CONCURRENCY") or "2")
+_scan_lock = threading.Lock()
+_last_scan: dict[str, str] = {}  # tf -> "YYYY-MM-DDTHH:MM" UTC slot key
 
 LOGIN_HTML = """<!doctype html><html><head><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\">
 <title>Own Trend Radar</title>
@@ -49,6 +60,117 @@ __ERR__
 
 def _token_for(password: str) -> str:
     return hmac.new(SESSION_SECRET, password.encode(), hashlib.sha256).hexdigest()
+
+
+def _run_scan(tfs: list[str], max_symbols: int | None = None) -> tuple[bool, str]:
+    """Run scan_gc_radar.py for given TFs. Returns (ok, note/error)."""
+    if not os.path.isfile(SCAN_SCRIPT):
+        return False, "scan_gc_radar.py missing"
+    if not tfs:
+        return False, "no tfs"
+    mx = max_symbols if max_symbols is not None else SCAN_MAX
+    cmd = [
+        sys.executable,
+        SCAN_SCRIPT,
+        "--tf",
+        ",".join(tfs),
+        "--max",
+        str(mx),
+        "--concurrency",
+        str(max(1, min(8, SCAN_CONCURRENCY))),
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=RESCAN_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return False, f"scan timed out (>{RESCAN_TIMEOUT_S}s)"
+    except OSError as e:
+        return False, str(e)
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "scan failed")[-2000:]
+        return False, err
+    return True, f"scanned {','.join(tfs)}"
+
+
+def _slot_key(now: datetime, kind: str) -> str:
+    """Dedup key so each schedule window runs once."""
+    if kind == "1d":
+        return now.strftime("%Y-%m-%d") + ":1d"
+    if kind == "4h":
+        # bar closes at 00/04/08/12/16/20; slot at :05
+        hour = (now.hour // 4) * 4
+        return now.strftime("%Y-%m-%d") + f":4h:{hour:02d}"
+    # 1h
+    return now.strftime("%Y-%m-%dT%H") + ":1h"
+
+
+def _due_tfs(now: datetime) -> list[tuple[str, int]]:
+    """Return list of (tf, max_symbols) due at this UTC minute (only at :05)."""
+    if now.minute != 5:
+        return []
+    due: list[tuple[str, int]] = []
+    # 1H every hour at :05
+    if _last_scan.get("1h") != _slot_key(now, "1h"):
+        due.append(("1h", SCAN_MAX_1H))
+    # 4H at 00/04/08/12/16/20 :05
+    if now.hour % 4 == 0 and _last_scan.get("4h") != _slot_key(now, "4h"):
+        due.append(("4h", SCAN_MAX))
+    # 1D daily at 00:05 UTC (= 08:05 HKT)
+    if now.hour == 0 and _last_scan.get("1d") != _slot_key(now, "1d"):
+        due.append(("1d", SCAN_MAX))
+    return due
+
+
+def _scheduler_loop() -> None:
+    sys.stderr.write("[scheduler] started UTC schedules: 1d@00:05 4h@*/4:05 1h@*:05\n")
+    # Soft boot: if radar files missing, scan after short delay (volume may be empty)
+    time.sleep(15)
+    missing = [
+        tf
+        for tf in ("1d", "4h", "1h")
+        if not os.path.isfile(os.path.join(OUT_DIR, f"gc_radar_{tf}.json"))
+    ]
+    if missing and _scan_lock.acquire(blocking=False):
+        try:
+            sys.stderr.write(f"[scheduler] boot scan missing={missing}\n")
+            # Prefer heavier TFs first; 1h uses lighter max
+            for tf in missing:
+                mx = SCAN_MAX_1H if tf == "1h" else SCAN_MAX
+                ok, note = _run_scan([tf], max_symbols=mx)
+                sys.stderr.write(f"[scheduler] boot tf={tf} ok={ok} {note[:200]}\n")
+                if ok:
+                    _last_scan[tf] = "boot"
+        finally:
+            _scan_lock.release()
+
+    while True:
+        try:
+            now = datetime.now(timezone.utc)
+            due = _due_tfs(now)
+            if due and _scan_lock.acquire(blocking=False):
+                try:
+                    # Mark slots first so we don't hammer if scan is slow past the minute
+                    for tf, _mx in due:
+                        _last_scan[tf] = _slot_key(now, tf)
+                    # Group: run 4h+1d together when both due; 1h alone or with them
+                    heavy = [tf for tf, _ in due if tf in ("1d", "4h")]
+                    light = [tf for tf, _ in due if tf == "1h"]
+                    if heavy:
+                        ok, note = _run_scan(heavy, max_symbols=SCAN_MAX)
+                        sys.stderr.write(f"[scheduler] {now.isoformat()} heavy={heavy} ok={ok} {note[:300]}\n")
+                    if light:
+                        ok, note = _run_scan(light, max_symbols=SCAN_MAX_1H)
+                        sys.stderr.write(f"[scheduler] {now.isoformat()} 1h ok={ok} {note[:300]}\n")
+                finally:
+                    _scan_lock.release()
+        except Exception as e:
+            sys.stderr.write(f"[scheduler] error: {e}\n")
+        time.sleep(20)
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -106,7 +228,15 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         path = urlparse(self.path).path
         if path in ("/health", "/healthz"):
-            self._send_json(200, {"ok": True})
+            self._send_json(
+                200,
+                {
+                    "ok": True,
+                    "scheduler": SCHEDULER_ENABLE,
+                    "last_scan": dict(_last_scan),
+                    "scanner": os.path.isfile(SCAN_SCRIPT),
+                },
+            )
             return
         if self._need_auth():
             return
@@ -127,9 +257,7 @@ class Handler(SimpleHTTPRequestHandler):
             self._sync()
             return
         if path == "/api/rescan":
-            if ON_RAILWAY:
-                self._send_json(403, {"ok": False, "error": "rescan disabled on Railway; use /api/sync"})
-                return
+            # Password-gated (same as UI); allowed on Railway so Harbor is optional
             if self._need_auth():
                 return
             self._rescan()
@@ -169,6 +297,7 @@ class Handler(SimpleHTTPRequestHandler):
         return rel
 
     def _sync(self) -> None:
+        """Merge-write: only replaces keys present in payload; never wipes omitted radar files."""
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length else b"{}"
         try:
@@ -225,37 +354,44 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _rescan(self) -> None:
         length = int(self.headers.get("Content-Length") or 0)
-        if length:
-            self.rfile.read(length)
-        if not os.path.isfile(SCAN_SCRIPT):
-            self._send_json(500, {"ok": False, "error": "scan_gc_radar.py missing"})
+        raw = self.rfile.read(length) if length else b""
+        tfs = ["1h", "4h", "1d"]
+        max_symbols = None
+        if raw:
+            try:
+                body = json.loads(raw.decode())
+                if isinstance(body, dict):
+                    if body.get("tf"):
+                        tfs = [t.strip() for t in str(body["tf"]).split(",") if t.strip()]
+                    if body.get("max") is not None:
+                        max_symbols = int(body["max"])
+            except Exception:
+                pass
+        if not _scan_lock.acquire(blocking=False):
+            self._send_json(409, {"ok": False, "error": "scan already running"})
             return
         try:
-            proc = subprocess.run(
-                [sys.executable, SCAN_SCRIPT, "--tf", "all"],
-                cwd=ROOT,
-                capture_output=True,
-                text=True,
-                timeout=RESCAN_TIMEOUT_S,
-            )
-        except subprocess.TimeoutExpired:
-            self._send_json(504, {"ok": False, "error": f"rescan timed out (>{RESCAN_TIMEOUT_S}s)"})
+            ok, note = _run_scan(tfs, max_symbols=max_symbols)
+        finally:
+            _scan_lock.release()
+        if not ok:
+            self._send_json(500, {"ok": False, "error": note})
             return
-        except OSError as e:
-            self._send_json(500, {"ok": False, "error": str(e)})
-            return
-        if proc.returncode != 0:
-            err = (proc.stderr or proc.stdout or "scan failed")[-2000:]
-            self._send_json(500, {"ok": False, "error": err, "returncode": proc.returncode})
-            return
-        self._send_json(200, {"ok": True, "note": "scanned 1h+4h+1d"})
+        self._send_json(200, {"ok": True, "note": note})
 
 
 def main() -> None:
     os.chdir(ROOT)
+    os.makedirs(OUT_DIR, exist_ok=True)
+    if SCHEDULER_ENABLE:
+        t = threading.Thread(target=_scheduler_loop, name="otr-scheduler", daemon=True)
+        t.start()
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"Own Trend Radar UI → http://0.0.0.0:{PORT}/", flush=True)
-    print(f"password_gate={'on' if PASSWORD else 'off'} railway={ON_RAILWAY}", flush=True)
+    print(
+        f"password_gate={'on' if PASSWORD else 'off'} railway={ON_RAILWAY} scheduler={SCHEDULER_ENABLE}",
+        flush=True,
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:
