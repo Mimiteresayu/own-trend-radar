@@ -7,3 +7,9 @@ ui_snapshot.html
 out/charts
 out/*.log
 .git
+# keep runtime radar/desk out of image (synced at runtime)
+out/**/*.json
+out/**/*.csv
+out/**/*.png
+out/**/*.log
+!out/.gitkeep
