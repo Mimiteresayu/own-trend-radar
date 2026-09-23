@@ -20,6 +20,7 @@
     --accent: #38bdf8;
     --amber: #f59e0b;
     --pink: #f472b6;
+    --purple: #a78bfa;
     --row-hover: #1a2330;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --sans: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -34,76 +35,115 @@
     line-height: 1.45;
     min-height: 100vh;
   }
+
+  /* ───── TOP HEADER ───── */
   header.app-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .header-row1 {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    padding: 12px 18px;
-    border-bottom: 1px solid var(--border);
-    background: var(--panel);
+    padding: 10px 18px;
   }
   .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .brand h1 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .brand h1 .dot { color: var(--muted); font-weight: 400; margin: 0 4px; }
+  .pill {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+  .pill-live { background: #1a2a1a; color: var(--green); border: 1px solid #2a4a2a; }
+  .pill-warn { background: rgba(245,158,11,0.18); color: var(--amber); border: 1px solid #6b4e12; }
+  .pill-err  { background: var(--red-dim); color: var(--red); border: 1px solid #5a1a1a; }
+
+  /* Breadth strip */
+  .breadth-strip {
     display: flex;
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
   }
-  .brand h1 {
-    margin: 0;
-    font-size: 0.95rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+  .bf-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 52px;
   }
-  .brand h1 .dot { color: var(--muted); font-weight: 500; margin: 0 4px; }
-  .status-pill {
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: #1a2a1a;
-    color: var(--green);
-    border: 1px solid #2a4a2a;
-  }
-  .status-pill.warn {
-    background: rgba(245, 158, 11, 0.18);
-    color: var(--amber);
-    border-color: #6b4e12;
-  }
-  .status-pill.err {
-    background: var(--red-dim);
-    color: var(--red);
-    border-color: #5a1a1a;
-  }
+  .bf-label { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+  .bf-val   { font-family: var(--mono); font-size: 0.95rem; font-weight: 700; }
+  .bf-val.bull { color: var(--green); }
+  .bf-val.bear { color: var(--red); }
+  .bf-bar-track { width: 52px; height: 4px; background: var(--red-dim); border-radius: 2px; overflow: hidden; margin-top: 3px; }
+  .bf-bar-fill  { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.5s; }
+
+  /* Header right */
   .header-right {
     display: flex;
     align-items: center;
     gap: 14px;
     flex-wrap: wrap;
   }
-  .desk-clock {
+  .hkt-clock {
     font-family: var(--mono);
     font-size: 0.78rem;
-    color: var(--muted);
+    color: var(--text);
+    font-weight: 600;
   }
-  .desk-clock strong { color: var(--text); font-weight: 600; }
-  .meta-line {
+  .refresh-badge {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .refresh-badge .spinning { animation: spin 1s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Freshness bar */
+  .freshness-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    padding: 5px 18px 7px;
+    border-top: 1px solid var(--border);
+    font-size: 0.7rem;
     color: var(--muted);
     font-family: var(--mono);
-    font-size: 0.72rem;
+    background: var(--bg);
   }
-  .meta-line .ok { color: var(--green); }
-  .meta-line .err { color: var(--red); }
+  .fresh-item .ok   { color: var(--green); }
+  .fresh-item .warn { color: var(--amber); }
+  .fresh-item .err  { color: var(--red); }
 
+  /* ───── NAV TABS ───── */
   .nav-tabs {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-    padding: 10px 18px 0;
+    padding: 8px 18px 0;
     border-bottom: 1px solid var(--border);
     background: var(--bg);
   }
@@ -112,7 +152,7 @@
     color: var(--muted);
     border: none;
     border-bottom: 2px solid transparent;
-    padding: 10px 14px;
+    padding: 9px 13px;
     font-size: 0.78rem;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -121,100 +161,18 @@
     font-family: inherit;
   }
   .nav-tabs button:hover { color: var(--text); }
-  .nav-tabs button.active {
-    color: var(--text);
-    border-bottom-color: var(--accent);
-  }
+  .nav-tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
 
-  main { padding: 14px 18px 36px; max-width: 1680px; margin: 0 auto; }
+  /* ───── MAIN ───── */
+  main { padding: 14px 18px 40px; max-width: 1760px; margin: 0 auto; }
 
-  /* ——— Cockpit grid ——— */
-  .cockpit-grid {
-    display: grid;
-    grid-template-columns: 200px minmax(0, 1fr) 240px;
-    gap: 12px;
-  }
-  @media (max-width: 1100px) {
-    .cockpit-grid { grid-template-columns: 1fr; }
-  }
-  .cockpit-bottom { margin-top: 12px; }
-  .pos-table-wrap { overflow: auto; max-height: none; }
-  .pos-table-wrap table { font-size: 0.82rem; }
-  .pos-table-wrap th { white-space: nowrap; position: sticky; top: 0; background: var(--panel); z-index: 1; }
-  .pos-table-wrap td { padding: 8px 10px; vertical-align: middle; }
-  .color-legend {
-    display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center;
-    font-size: 0.75rem; color: var(--muted); padding: 8px 12px;
-  }
-  .color-legend .lg { color: var(--green); font-weight: 600; }
-  .color-legend .lr { color: var(--red); font-weight: 600; }
-  .curve-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.72rem; color: var(--muted); margin-top: 6px; }
-  .curve-legend span::before {
-    content: ""; display: inline-block; width: 10px; height: 3px; margin-right: 6px;
-    vertical-align: middle; border-radius: 1px; background: currentColor;
-  }
-  .curve-legend .eq { color: #38bdf8; }
-  .curve-legend .btc { color: #f59e0b; }
-  .curve-legend .bun { color: #a78bfa; }
-  .chart-box.full { min-height: 220px; }
-  .chart-box.full canvas { width: 100%; height: 220px; }
   .panel {
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 8px;
   }
   .panel-pad { padding: 14px; }
-  .left-col, .right-col {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .center-col {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    min-width: 0;
-  }
-
-  .kpi-label {
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 4px;
-  }
-  .kpi-big {
-    font-family: var(--mono);
-    font-size: 1.65rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
-  }
-  .kpi-big.pos { color: var(--green); }
-  .kpi-big.neg { color: var(--pink); }
-  .kpi-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 7px 0;
-    border-bottom: 1px solid var(--border);
-    font-family: var(--mono);
-    font-size: 0.8rem;
-  }
-  .kpi-row:last-child { border-bottom: none; }
-  .kpi-row .k { color: var(--muted); font-family: var(--sans); font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; }
-  .kpi-row .v { font-weight: 600; }
-  .pos { color: var(--green); }
-  .neg { color: var(--red); }
-  .accent { color: var(--accent); }
-
-  .chart-area {
-    min-height: 260px;
-    display: flex;
-    flex-direction: column;
-  }
-  .chart-area .panel-head {
+  .panel-head {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -229,312 +187,111 @@
     text-transform: uppercase;
     color: var(--muted);
   }
-  .chart-split {
-    display: grid;
-    grid-template-columns: 1.2fr 1fr;
-    gap: 0;
-    flex: 1;
-    min-height: 220px;
-  }
-  @media (max-width: 900px) {
-    .chart-split { grid-template-columns: 1fr; }
-  }
-  .chart-split .chart-box {
-    padding: 10px;
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    min-height: 200px;
-  }
-  .chart-split .chart-box:last-child { border-right: none; }
-  .chart-box canvas {
-    width: 100%;
-    height: 180px;
-    display: block;
-  }
-  .chart-box img {
-    width: 100%;
-    height: 180px;
-    object-fit: contain;
-    background: #0d1118;
-    border-radius: 4px;
-  }
-  .chart-caption {
-    font-size: 0.68rem;
-    color: var(--muted);
-    margin-top: 6px;
-    font-family: var(--mono);
-  }
+  .hidden { display: none !important; }
 
-  .mid-widgets {
+  /* ───── COCKPIT ───── */
+  .ck-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
+    grid-template-columns: 190px minmax(0, 1fr) 280px;
+    gap: 12px;
   }
-  @media (max-width: 900px) {
-    .mid-widgets { grid-template-columns: 1fr 1fr; }
-  }
-  .widget {
-    padding: 12px 14px;
-    min-height: 88px;
-  }
-  .widget .w-val {
-    font-family: var(--mono);
-    font-size: 1.35rem;
-    font-weight: 700;
-    margin-top: 6px;
-  }
-  .widget .w-sub {
-    font-size: 0.7rem;
-    color: var(--muted);
-    margin-top: 4px;
-    font-family: var(--mono);
-  }
-  .widget canvas.spark {
-    width: 100%;
-    height: 36px;
-    margin-top: 8px;
-    display: block;
-  }
+  @media (max-width: 1100px) { .ck-grid { grid-template-columns: 1fr; } }
+  .left-col, .right-col { display: flex; flex-direction: column; gap: 10px; }
+  .center-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 
-  .donut-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  @media (max-width: 700px) {
-    .donut-row { grid-template-columns: 1fr; }
-  }
-  .donut-card {
-    padding: 12px 14px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .donut-wrap {
-    position: relative;
-    width: 88px;
-    height: 88px;
-    flex-shrink: 0;
-  }
-  .donut-wrap canvas { width: 88px; height: 88px; }
-  .donut-center {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-  }
-  .donut-center .n {
-    font-family: var(--mono);
-    font-size: 1.25rem;
+  .kpi-label {
+    font-size: 0.65rem;
     font-weight: 700;
-    line-height: 1;
-  }
-  .donut-center .lbl {
-    font-size: 0.58rem;
-    color: var(--muted);
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    margin-top: 2px;
+    color: var(--muted);
+    margin-bottom: 4px;
   }
-  .donut-legend {
-    font-size: 0.78rem;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  .kpi-big {
+    font-family: var(--mono);
+    font-size: 1.65rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
   }
-  .donut-legend .row {
+  .kpi-big.pos { color: var(--green); }
+  .kpi-big.neg { color: var(--red); }
+  .kpi-row {
     display: flex;
-    align-items: center;
+    justify-content: space-between;
     gap: 8px;
-  }
-  .swatch {
-    width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;
-  }
-
-  .right-tabs {
-    display: flex;
-    gap: 0;
+    padding: 6px 0;
     border-bottom: 1px solid var(--border);
-  }
-  .right-tabs button {
-    flex: 1;
-    background: transparent;
-    color: var(--muted);
-    border: none;
-    border-bottom: 2px solid transparent;
-    padding: 10px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .right-tabs button.active {
-    color: var(--text);
-    border-bottom-color: var(--accent);
-  }
-  .action-list, .pos-list {
-    max-height: 420px;
-    overflow-y: auto;
-    padding: 4px 0;
-  }
-  .action-item, .pos-item {
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.75rem;
-  }
-  .action-item:hover, .pos-item:hover { background: var(--row-hover); }
-  .action-item .act {
     font-family: var(--mono);
-    font-weight: 600;
-    color: var(--accent);
-  }
-  .action-item .note {
-    color: var(--muted);
-    margin-top: 2px;
-    word-break: break-word;
-  }
-  .pos-item {
-    display: grid;
-    grid-template-columns: 56px 1fr auto;
-    gap: 6px;
-    align-items: center;
-    font-family: var(--mono);
-  }
-  .pos-item .coin { font-weight: 700; }
-  .pos-item .side-long { color: var(--green); font-size: 0.68rem; }
-  .pos-item .side-short { color: var(--red); font-size: 0.68rem; }
-  .pos-item .meta { color: var(--muted); font-size: 0.68rem; }
-  .empty-hint {
-    padding: 20px;
-    text-align: center;
-    color: var(--muted);
     font-size: 0.8rem;
   }
+  .kpi-row:last-child { border-bottom: none; }
+  .kpi-row .k { color: var(--muted); font-family: var(--sans); font-size: 0.7rem; letter-spacing: 0.04em; text-transform: uppercase; }
+  .kpi-row .v { font-weight: 600; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .accent { color: var(--accent); }
+  .amber  { color: var(--amber); }
 
-
-  .tier-mega, .tier-large { color: #d4b96a; }
-  .tier-small, .tier-tiny { color: #8b9bab; }
-  .cat-Narrative { color: #c9a0ff; }
-  .cat-Cemetery { color: #e3a857; }
-  .cat-Price { color: var(--muted); }
-  .us-below { color: var(--muted); }
-  .us-wick { color: #e3a857; }
-  .us-open { color: #79b8ff; }
-  .us-close { color: #3fb950; font-weight: 600; }
-  .us-upper { color: #7ee787; }
-
-  /* ——— Radar / shared table styles ——— */
-  .tf-tabs, .filters {
+  /* Multi-TF breadth panel */
+  .breadth-panel {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 8px;
-    margin-bottom: 14px;
+    padding: 12px 14px;
   }
-  .tf-tabs button, .filters button {
-    background: var(--panel);
-    color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 6px;
+  .breadth-tf-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .btf-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); min-width: 28px; }
+  .btf-track { flex: 1; height: 8px; background: var(--red-dim); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+  .btf-fill { height: 100%; background: linear-gradient(90deg, #16a34a, var(--green)); border-radius: 4px; transition: width 0.5s; }
+  .btf-val { font-family: var(--mono); font-size: 0.82rem; font-weight: 700; min-width: 50px; text-align: right; }
+  .btf-counts { font-size: 0.68rem; color: var(--muted); font-family: var(--mono); min-width: 90px; text-align: right; }
+
+  /* Entry candidates panel (right col) */
+  .candidates-list { max-height: 340px; overflow-y: auto; }
+  .cand-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 7px 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .tf-tabs button:hover, .filters button:hover { color: var(--text); border-color: #2e4055; }
-  .tf-tabs button.active {
-    color: #0b0f14;
-    background: var(--accent);
-    border-color: var(--accent);
-  }
-  .filters button.active {
-    color: var(--text);
-    border-color: var(--accent);
-    background: #0f1c28;
-  }
-  .breadth {
-    display: grid;
-    gap: 10px;
-    margin-bottom: 16px;
-    padding: 14px 16px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-  }
-  .breadth-stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px 24px;
-    align-items: center;
-  }
-  .stat { font-family: var(--mono); font-size: 0.9rem; }
-  .stat .g { color: var(--green); font-weight: 700; }
-  .stat .r { color: var(--red); font-weight: 700; }
-  .stat .pct { color: var(--accent); font-weight: 700; }
-  .bar-track {
-    height: 10px;
-    background: var(--red-dim);
-    border-radius: 5px;
-    overflow: hidden;
-    border: 1px solid var(--border);
-  }
-  .bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #16a34a, var(--green));
-    width: 0%;
-    transition: width 0.4s ease;
-  }
-  .flags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 4px;
-    font-size: 0.8rem;
-    color: var(--muted);
-  }
-  .chip {
-    font-family: var(--mono);
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-  .chip.up { background: var(--green-dim); color: var(--green); border: 1px solid #1a5a30; }
-  .chip.down { background: var(--red-dim); color: var(--red); border: 1px solid #5a1a1a; }
-  .table-wrap {
-    overflow-x: auto;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--panel);
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: var(--mono);
-    font-size: 0.8rem;
-    min-width: 1100px;
-  }
-  th, td {
-    padding: 8px 10px;
-    text-align: right;
     border-bottom: 1px solid var(--border);
-    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: 0.78rem;
   }
+  .cand-item:hover { background: var(--row-hover); }
+  .cand-item:last-child { border-bottom: none; }
+  .cand-coin { font-weight: 700; min-width: 56px; }
+  .cand-tier { font-size: 0.65rem; padding: 2px 6px; border-radius: 3px; }
+  .tier-mega  { background: rgba(212,185,106,0.15); color: #d4b96a; }
+  .tier-large { background: rgba(212,185,106,0.12); color: #c4a940; }
+  .tier-small { background: rgba(139,155,176,0.12); color: #8b9bb0; }
+  .tier-tiny  { background: rgba(139,155,176,0.08); color: #6b7b90; }
+  .cand-type  { font-size: 0.65rem; color: var(--accent); letter-spacing: 0.04em; }
+  .cand-price { color: var(--muted); font-size: 0.7rem; margin-left: auto; }
+  .empty-hint { padding: 20px; text-align: center; color: var(--muted); font-size: 0.8rem; }
+
+  /* WATCH badge */
+  .watch-badge { font-size: 0.6rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: rgba(245,158,11,0.2); color: var(--amber); border: 1px solid #6b4e12; }
+  .exit-badge  { font-size: 0.6rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: var(--red-dim); color: var(--red); border: 1px solid #5a1a1a; }
+  .hold-badge  { font-size: 0.6rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: var(--green-dim); color: var(--green); border: 1px solid #1a5a30; }
+
+  /* ───── POSITIONS TABLE ───── */
+  .ck-bottom { margin-top: 12px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.8rem; min-width: 900px; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th:first-child, td:first-child,
   th:nth-child(2), td:nth-child(2) { text-align: left; }
   th {
-    position: sticky;
-    top: 0;
+    position: sticky; top: 0;
     background: #0e141c;
     color: var(--muted);
     font-weight: 600;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     cursor: pointer;
@@ -545,1009 +302,1104 @@
   th.sorted .arrow { opacity: 1; color: var(--accent); }
   tbody tr:hover { background: var(--row-hover); }
   tr.hl-up { background: var(--green-dim); }
-  tr.hl-up:hover { background: rgba(34, 197, 94, 0.22); }
+  tr.hl-up:hover { background: rgba(34,197,94,0.22); }
   tr.hl-down { background: var(--red-dim); }
-  tr.hl-down:hover { background: rgba(239, 68, 68, 0.22); }
-  .trend-g { color: var(--green); font-weight: 700; }
-  .exit-cell { font-family: var(--mono); font-size: 0.68rem; line-height: 1.25; text-align: right; }
-  .exit-cell .px { color: var(--muted); display: block; }
-  .exit-cell .pnl.pos { color: var(--green); font-weight: 700; }
-  .exit-cell .pnl.neg { color: var(--red); font-weight: 700; }
-  .exit-cell .fade { color: var(--amber); font-size: 0.6rem; }
+  tr.hl-down:hover { background: rgba(239,68,68,0.22); }
+  tr.hl-watch { background: rgba(245,158,11,0.08); }
+
+  .gc-cell { font-size: 0.7rem; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+  .gc-1h { font-weight: 700; }
+  .gc-4h { opacity: 0.75; }
+  .gc-g { color: var(--green); }
+  .gc-r { color: var(--red); }
+  .gc-m { color: var(--muted); }
+
+  .sl-cell { color: var(--amber); font-weight: 600; }
+
+  /* ───── RADAR ───── */
+  .tf-tabs, .filters {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+  }
+  .tf-tabs button, .filters button {
+    background: var(--panel); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 12px; font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .tf-tabs button:hover, .filters button:hover { color: var(--text); border-color: #2e4055; }
+  .tf-tabs button.active { color: #0b0f14; background: var(--accent); border-color: var(--accent); }
+  .filters button.active { color: var(--text); border-color: var(--accent); background: #0f1c28; }
+
+  .breadth-box {
+    display: grid; gap: 10px; margin-bottom: 16px; padding: 14px 16px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .breadth-stats { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: center; }
+  .stat { font-family: var(--mono); font-size: 0.9rem; }
+  .stat .g { color: var(--green); font-weight: 700; }
+  .stat .r { color: var(--red); font-weight: 700; }
+  .stat .pct { color: var(--accent); font-weight: 700; }
+  .bar-track { height: 10px; background: var(--red-dim); border-radius: 5px; overflow: hidden; border: 1px solid var(--border); }
+  .bar-fill  { height: 100%; background: linear-gradient(90deg, #16a34a, var(--green)); width: 0%; transition: width 0.4s ease; }
+  .flags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; font-size: 0.8rem; color: var(--muted); }
+  .chip { font-family: var(--mono); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .chip.up   { background: var(--green-dim); color: var(--green); border: 1px solid #1a5a30; }
+  .chip.down { background: var(--red-dim);   color: var(--red);   border: 1px solid #5a1a1a; }
+
+  .cat-Narrative { color: #c9a0ff; }
+  .cat-Cemetery  { color: #e3a857; }
+  .cat-Price     { color: var(--muted); }
+  .us-below { color: var(--muted); }
+  .us-wick  { color: #e3a857; }
+  .us-open  { color: #79b8ff; }
+  .us-close { color: #3fb950; font-weight: 600; }
+  .us-upper { color: #7ee787; }
+  .trend-g  { color: var(--green); font-weight: 700; }
+  .trend-r  { color: var(--red); font-weight: 700; }
+  .bool-y   { color: var(--green); }
+  .bool-n   { color: #3a4656; }
+  .bool-bad { color: var(--red); }
+
+  /* ───── ENTRY tab ───── */
+  .entry-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 900px) { .entry-grid { grid-template-columns: 1fr; } }
+  .entry-section-head {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--border);
+  }
+  .entry-section-head .badge {
+    display: inline-block; margin-left: 8px; font-size: 0.6rem; padding: 2px 7px;
+    border-radius: 999px; background: var(--green-dim); color: var(--green); border: 1px solid #1a5a30;
+  }
+  .entry-rows { max-height: 400px; overflow-y: auto; }
+  .entry-row {
+    display: grid; grid-template-columns: 60px 60px 1fr auto auto; gap: 6px;
+    align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 0.78rem;
+  }
+  .entry-row:last-child { border-bottom: none; }
+  .entry-row:hover { background: var(--row-hover); }
+  .er-coin { font-weight: 700; }
+  .er-note { font-size: 0.68rem; color: var(--muted); white-space: normal; }
+  .er-price { text-align: right; color: var(--muted); font-size: 0.7rem; }
+
+  /* ───── DESK tab (legacy) ───── */
   .observe-banner {
     margin: 8px 0 10px; padding: 8px 12px; border-radius: 6px;
-    background: rgba(245, 158, 11, 0.12); border: 1px solid #6b4e12;
+    background: rgba(245,158,11,0.12); border: 1px solid #6b4e12;
     color: var(--amber); font-size: 0.78rem; font-weight: 600;
   }
-  .pos-exits { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 4px; }
-  .pos-exits .ex { font-family: var(--mono); font-size: 0.62rem; color: var(--muted); }
-  .pos-exits .ex .pnl.pos { color: var(--green); }
-  .pos-exits .ex .pnl.neg { color: var(--red); }
 
-  .trend-r { color: var(--red); font-weight: 700; }
-  .bool-y { color: var(--green); }
-  .bool-n { color: #3a4656; }
-  .bool-bad { color: var(--red); }
-  .empty {
-    padding: 32px;
-    text-align: center;
-    color: var(--muted);
-  }
-  footer {
-    margin-top: 16px;
-    color: var(--muted);
-    font-size: 0.75rem;
-  }
-  .hidden { display: none !important; }
+  /* ───── NARRATIVE tab ───── */
+
+  /* ───── FOOTER ───── */
+  footer { margin-top: 16px; color: var(--muted); font-size: 0.75rem; font-family: var(--mono); }
+
+  /* color legend */
+  .color-legend { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-size: 0.72rem; color: var(--muted); padding: 8px 12px; }
+  .color-legend .lg { color: var(--green); font-weight: 600; }
+  .color-legend .lr { color: var(--red);   font-weight: 600; }
+
+  /* Donut row */
+  .donut-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 700px) { .donut-row { grid-template-columns: 1fr; } }
+  .donut-card { padding: 12px 14px; display: flex; align-items: center; gap: 14px; }
+  .donut-wrap { position: relative; width: 80px; height: 80px; flex-shrink: 0; }
+  .donut-wrap canvas { width: 80px; height: 80px; }
+  .donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+  .donut-center .n   { font-family: var(--mono); font-size: 1.2rem; font-weight: 700; line-height: 1; }
+  .donut-center .lbl { font-size: 0.58rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 2px; }
+  .donut-legend { font-size: 0.75rem; display: flex; flex-direction: column; gap: 5px; }
+  .donut-legend .row { display: flex; align-items: center; gap: 7px; }
+  .swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+  .empty { padding: 32px; text-align: center; color: var(--muted); }
 </style>
 </head>
 <body>
+
 <header class="app-header">
-  <div class="brand">
-    <h1>Harbor<span class="dot">·</span>HL Autotrade</h1>
-    <span class="status-pill" id="statusPill">DRY_RUN</span>
+  <div class="header-row1">
+    <!-- Brand -->
+    <div class="brand">
+      <h1>Harbor<span class="dot">·</span>HL Autotrade</h1>
+      <span class="pill pill-live" id="modePill">DRY_RUN</span>
+    </div>
+
+    <!-- Multi-TF breadth strip -->
+    <div class="breadth-strip" id="breadthStrip">
+      <div class="bf-cell">
+        <div class="bf-label">1H %</div>
+        <div class="bf-val" id="bv1h">—</div>
+        <div class="bf-bar-track"><div class="bf-bar-fill" id="bb1h" style="width:0%"></div></div>
+      </div>
+      <div class="bf-cell">
+        <div class="bf-label">4H %</div>
+        <div class="bf-val" id="bv4h">—</div>
+        <div class="bf-bar-track"><div class="bf-bar-fill" id="bb4h" style="width:0%"></div></div>
+      </div>
+      <div class="bf-cell">
+        <div class="bf-label">1D %</div>
+        <div class="bf-val" id="bv1d">—</div>
+        <div class="bf-bar-track"><div class="bf-bar-fill" id="bb1d" style="width:0%"></div></div>
+      </div>
+      <div style="width:1px;height:28px;background:var(--border);margin:0 4px"></div>
+      <div class="bf-cell" style="min-width:80px;align-items:flex-start">
+        <div class="bf-label">BTC 1D</div>
+        <div class="bf-val" id="btcTrend">—</div>
+        <div style="font-size:0.62rem;color:var(--muted);font-family:var(--mono)" id="btcSub">—</div>
+      </div>
+    </div>
+
+    <!-- Right: clock + refresh -->
+    <div class="header-right">
+      <div class="hkt-clock" id="hktClock">--:--:-- HKT</div>
+      <div class="refresh-badge">
+        <span id="refreshIcon">↻</span>
+        <span id="refreshCountdown">60s</span>
+      </div>
+    </div>
   </div>
-  <div class="header-right">
-    <div class="desk-clock" id="deskClock">Desk <strong>—</strong></div>
-    <div class="meta-line" id="meta">Loading…</div>
+
+  <!-- Freshness row -->
+  <div class="freshness-row" id="freshnessRow">
+    <span class="fresh-item">1H: <span id="fr1h" class="warn">—</span></span>
+    <span class="fresh-item">4H: <span id="fr4h" class="warn">—</span></span>
+    <span class="fresh-item">1D: <span id="fr1d" class="warn">—</span></span>
+    <span class="fresh-item" style="margin-left:auto;color:var(--muted)" id="frMeta">Ready</span>
   </div>
 </header>
 
-<nav class="nav-tabs" id="mainTabs" role="tablist" aria-label="Views">
-  <button type="button" data-view="cockpit" class="active" role="tab">Cockpit</button>
-  <button type="button" data-view="radar" role="tab">Radar</button>
-  <button type="button" data-view="narrative" role="tab">Narrative</button>
-  <button type="button" data-view="desk" role="tab">Desk</button>
+<nav class="nav-tabs" id="mainTabs">
+  <button type="button" data-view="cockpit" class="active">Cockpit</button>
+  <button type="button" data-view="entry">Entry</button>
+  <button type="button" data-view="radar">Radar</button>
+  <button type="button" data-view="narrative">Narrative</button>
+  <button type="button" data-view="desk">Desk</button>
 </nav>
 
 <main>
-  <!-- COCKPIT -->
-  <div id="cockpitPanel">
-    <div class="cockpit-grid">
-      <!-- LEFT -->
-      <aside class="left-col">
-        <div class="panel panel-pad">
-          <div class="kpi-label">Equity</div>
-          <div class="kpi-big" id="ckEq">—</div>
-          <div style="margin-top:12px">
-            <div class="kpi-row"><span class="k">Change / uPnL</span><span class="v" id="ckUpnl">—</span></div>
-            <div class="kpi-row"><span class="k">Margin used</span><span class="v" id="ckMargin">—</span></div>
-            <div class="kpi-row"><span class="k">Free USDC</span><span class="v accent" id="ckFree">—</span></div>
-            <div class="kpi-row"><span class="k">Breadth green</span><span class="v pos" id="ckBreadth">—</span></div>
-            <div class="kpi-row"><span class="k">Worst coin uPnL</span><span class="v" id="ckWorst">—</span></div>
-          </div>
-        </div>
-        <div class="panel panel-pad">
-          <div class="kpi-label">Account <span style="color:var(--muted);font-weight:400">(Unified)</span></div>
-          <div class="kpi-row"><span class="k">USDC (equity)</span><span class="v" id="ckSpot">—</span></div>
-          <div class="kpi-row"><span class="k">Margin view</span><span class="v" id="ckNav">—</span></div>
-          <div class="kpi-row"><span class="k">Notional</span><span class="v" id="ckNtl">—</span></div>
-          <div class="kpi-row"><span class="k">Wallet</span><span class="v" id="ckAddr" style="font-size:0.7rem">—</span></div>
-          <div class="chart-caption" style="margin-top:8px">Equity = USDC total. Margin view ≠ extra cash — do not add.</div>
-        </div>
-      </aside>
 
-      <!-- CENTER -->
-      <section class="center-col">
-        <div class="panel chart-area panel-pad">
-          <div class="panel-head">
-            <h2>Equity vs BTC vs Bitunix</h2>
-            <span class="chart-caption" id="ckChartTs">—</span>
-          </div>
-          <div class="chart-box full">
-            <canvas id="ckCurve" width="900" height="240" aria-label="equity vs btc vs bitunix"></canvas>
-            <div class="curve-legend">
-              <span class="eq">HL Equity %</span>
-              <span class="btc">BTC %</span>
-              <span class="bun">Bitunix BTC %</span>
-            </div>
-            <div class="chart-caption" id="ckCurveNote">Normalized % from first point · equity history builds each desk run</div>
-          </div>
+<!-- ═══════════════ COCKPIT ═══════════════ -->
+<div id="viewCockpit">
+  <div class="ck-grid">
+    <!-- LEFT: Account KPIs -->
+    <aside class="left-col">
+      <div class="panel panel-pad">
+        <div class="kpi-label">Equity</div>
+        <div class="kpi-big" id="ckEq">—</div>
+        <div style="margin-top:10px">
+          <div class="kpi-row"><span class="k">uPnL</span><span class="v" id="ckUpnl">—</span></div>
+          <div class="kpi-row"><span class="k">Margin</span><span class="v" id="ckMargin">—</span></div>
+          <div class="kpi-row"><span class="k">Free USDC</span><span class="v accent" id="ckFree">—</span></div>
+          <div class="kpi-row"><span class="k">Positions</span><span class="v" id="ckPosCount">—</span></div>
+          <div class="kpi-row"><span class="k">Worst uPnL</span><span class="v" id="ckWorst">—</span></div>
         </div>
+      </div>
 
-        <div class="mid-widgets">
-          <div class="panel widget">
-            <div class="kpi-label">Breadth %</div>
-            <div class="w-val accent" id="ckWBreadth">—</div>
-            <div class="w-sub" id="ckWBreadthSub">1D green</div>
-            <canvas class="spark" id="sparkBreadth" width="200" height="36"></canvas>
-          </div>
-          <div class="panel widget">
-            <div class="kpi-label">BTC regime</div>
-            <div class="w-val" id="ckWBtc">—</div>
-            <div class="w-sub" id="ckWBtcSub">—</div>
-          </div>
-          <div class="panel widget">
-            <div class="kpi-label">Exposure</div>
-            <div class="w-val accent" id="ckWExp">—</div>
-            <div class="w-sub" id="ckWExpSub">margin / eq</div>
-            <canvas class="spark" id="sparkExp" width="200" height="36"></canvas>
-          </div>
-          <div class="panel widget">
-            <div class="kpi-label">uPnL / eq</div>
-            <div class="w-val" id="ckWDd">—</div>
-            <div class="w-sub">green + · red −</div>
-            <canvas class="spark" id="sparkDd" width="200" height="36"></canvas>
-          </div>
-        </div>
-
-        <div class="donut-row">
-          <div class="panel donut-card">
-            <div class="donut-wrap">
-              <canvas id="donutLong" width="88" height="88"></canvas>
-              <div class="donut-center"><span class="n" id="donutLongN">0</span><span class="lbl">Long</span></div>
-            </div>
-            <div class="donut-legend">
-              <div class="kpi-label" style="margin:0">Long / Short</div>
-              <div class="row"><span class="swatch" style="background:var(--green)"></span><span id="legLong">Long —</span></div>
-              <div class="row"><span class="swatch" style="background:var(--red)"></span><span id="legShort">Short —</span></div>
-            </div>
-          </div>
-          <div class="panel donut-card">
-            <div class="donut-wrap">
-              <canvas id="donutSleeve" width="88" height="88"></canvas>
-              <div class="donut-center"><span class="n" id="donutSleeveN">0</span><span class="lbl">Pos</span></div>
-            </div>
-            <div class="donut-legend">
-              <div class="kpi-label" style="margin:0">Own vs Majors</div>
-              <div class="row"><span class="swatch" style="background:var(--accent)"></span><span id="legOwn">Own —</span></div>
-              <div class="row"><span class="swatch" style="background:var(--amber)"></span><span id="legMaj">Majors —</span></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- RIGHT: actions only -->
-      <aside class="right-col">
-        <div class="panel" style="flex:1;display:flex;flex-direction:column;min-height:200px">
-          <div class="panel-head" style="padding:10px 12px;border-bottom:1px solid var(--border)">
-            <h2 style="margin:0;font-size:0.85rem">Actions</h2>
-          </div>
-          <div id="rtabActions" class="action-list"></div>
-        </div>
-      </aside>
-    </div>
-
-    <!-- Positions: full-width table (readable) -->
-    <div class="cockpit-bottom">
+      <!-- Multi-TF breadth panel -->
       <div class="panel">
-        <div class="panel-head" style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-          <h2 style="margin:0;font-size:0.95rem">Positions</h2>
-          <div class="color-legend">
-            <span><span class="lg">Green = positive (+)</span></span>
-            <span><span class="lr">Red = negative (−)</span></span>
-            <span>1H/4H/Nb/Mom = PnL if exit at that level</span>
+        <div class="panel-head"><h2>Market Breadth</h2></div>
+        <div class="breadth-panel" id="ckBreadthPanel">
+          <div class="breadth-tf-row">
+            <span class="btf-label">1H</span>
+            <div class="btf-track"><div class="btf-fill" id="ck_bf1h" style="width:0%"></div></div>
+            <span class="btf-val" id="ck_bv1h">—</span>
+            <span class="btf-counts" id="ck_bc1h">—</span>
+          </div>
+          <div class="breadth-tf-row">
+            <span class="btf-label">4H</span>
+            <div class="btf-track"><div class="btf-fill" id="ck_bf4h" style="width:0%"></div></div>
+            <span class="btf-val" id="ck_bv4h">—</span>
+            <span class="btf-counts" id="ck_bc4h">—</span>
+          </div>
+          <div class="breadth-tf-row">
+            <span class="btf-label">1D</span>
+            <div class="btf-track"><div class="btf-fill" id="ck_bf1d" style="width:0%"></div></div>
+            <span class="btf-val" id="ck_bv1d">—</span>
+            <span class="btf-counts" id="ck_bc1d">—</span>
           </div>
         </div>
-        <div class="pos-table-wrap table-wrap">
+      </div>
+
+      <!-- Donuts -->
+      <div class="donut-row">
+        <div class="panel donut-card">
+          <div class="donut-wrap">
+            <canvas id="donutLong" width="80" height="80"></canvas>
+            <div class="donut-center"><span class="n" id="donutLongN">0</span><span class="lbl">Long</span></div>
+          </div>
+          <div class="donut-legend">
+            <div class="kpi-label" style="margin:0">L / S</div>
+            <div class="row"><span class="swatch" style="background:var(--green)"></span><span id="legLong">—</span></div>
+            <div class="row"><span class="swatch" style="background:var(--red)"></span><span id="legShort">—</span></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: Positions (full) -->
+    <section class="center-col">
+      <div class="panel">
+        <div class="panel-head" style="flex-wrap:wrap;gap:8px">
+          <h2>Open Positions <span id="ckPosHead" style="color:var(--text);font-size:0.85rem;font-weight:700"></span></h2>
+          <div class="color-legend">
+            <span><span class="lg">▲ uPnL+</span></span>
+            <span><span class="lr">▼ uPnL−</span></span>
+            <span style="color:var(--amber)">● WATCH</span>
+            <span>SL = 4H Filter · Exit = tier SoT</span>
+          </div>
+        </div>
+        <div class="table-wrap" style="border:none;border-radius:0">
           <table>
             <thead>
               <tr>
-                <th>coin</th><th>side</th><th>size</th><th>entry</th><th>value</th><th>uPnL</th><th>lev</th><th>liq</th>
-                <th>SL 4H Filter</th><th>1H</th><th>4H</th><th>Nbar</th><th>Mom</th>
+                <th>Coin</th><th>Side</th><th>Size</th><th>Entry</th>
+                <th>Value</th><th>uPnL</th><th>Lev</th>
+                <th>GC 1H/4H</th>
+                <th>SL (4H Filter)</th>
+                <th>SL gap%</th>
+                <th>Exit Signal</th>
               </tr>
             </thead>
-            <tbody id="ckPosTable"></tbody>
+            <tbody id="ckPosBody"></tbody>
           </table>
         </div>
       </div>
+    </section>
+
+    <!-- RIGHT: Entry candidates -->
+    <aside class="right-col">
+      <div class="panel" style="flex:1;display:flex;flex-direction:column">
+        <div class="panel-head" style="padding:10px 12px">
+          <h2>1D Base Entry · dual_cross_up</h2>
+          <span class="pill pill-live" id="entryCount">0</span>
+        </div>
+        <div class="candidates-list" id="ckCandBase"></div>
+      </div>
+      <div class="panel" style="flex:1;display:flex;flex-direction:column">
+        <div class="panel-head" style="padding:10px 12px">
+          <h2>Chase · 1D green + 4H cross_up</h2>
+          <span class="pill pill-warn" id="chaseCount">0</span>
+        </div>
+        <div class="candidates-list" id="ckCandChase"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ═══════════════ ENTRY ═══════════════ -->
+<div id="viewEntry" class="hidden">
+  <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <span class="pill pill-live" id="entryTsLabel">1D scan: —</span>
+    <span style="font-size:0.78rem;color:var(--muted)">Window: 08:40 HKT only · Base = 1D dual_cross_up · Chase = 1D green + 4H dual_cross_up</span>
+  </div>
+  <div class="entry-grid">
+    <!-- Base entries -->
+    <div class="panel">
+      <div class="entry-section-head">
+        Base Entry · 1D dual_cross_up
+        <span class="badge" id="baseEntryBadge">0</span>
+      </div>
+      <div class="entry-rows" id="baseEntryList">
+        <div class="empty">Loading 1D radar…</div>
+      </div>
+    </div>
+    <!-- Chase entries -->
+    <div class="panel">
+      <div class="entry-section-head">
+        Chase Entry · 1D Green + 4H dual_cross_up
+        <span class="badge" id="chaseEntryBadge">0</span>
+      </div>
+      <div class="entry-rows" id="chaseEntryList">
+        <div class="empty">Loading 4H radar…</div>
+      </div>
     </div>
   </div>
 
-  <!-- RADAR -->
-  <div id="radarPanel" class="hidden">
-    <div class="tf-tabs" id="tfTabs" role="tablist" aria-label="Timeframes">
-      <button type="button" data-tf="1h" role="tab">1H</button>
-      <button type="button" data-tf="4h" role="tab">4H</button>
-      <button type="button" data-tf="1d" class="active" role="tab">1D</button>
-    </div>
-    <section class="breadth" id="breadth">
-      <div class="breadth-stats">
-        <div class="stat">Green <span class="g" id="gCount">—</span></div>
-        <div class="stat">Red <span class="r" id="rCount">—</span></div>
-        <div class="stat">Green% <span class="pct" id="gPct">—</span></div>
-        <div class="stat" style="color:var(--muted)">n=<span id="nCount">—</span></div>
-        <div class="stat" style="color:var(--muted)">tf=<span id="tfLabel">1d</span></div>
-      </div>
-      <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
-      <div class="flags" id="flagLine"></div>
-    </section>
-    <div class="filters" id="filters" role="group" aria-label="Filters">
-      <button type="button" data-f="all" class="active">All</button>
-      <button type="button" data-f="green">Green</button>
-      <button type="button" data-f="red">Red</button>
-      <button type="button" data-f="dual_cross_up">Dual cross up</button>
-      <button type="button" data-f="dual_cross_down_filter">Dual cross down filter</button>
-      <button type="button" data-f="above_upper">Above upper</button>
-    </div>
-    <div class="table-wrap">
+  <!-- 1D Green universe summary -->
+  <div class="panel" style="margin-top:12px">
+    <div class="panel-head"><h2>1D Green universe (above_upper or close to upper)</h2></div>
+    <div class="table-wrap" style="border:none;border-radius:0">
       <table>
         <thead>
           <tr>
-            <th data-k="symbol">symbol <span class="arrow">↕</span></th>
-            <th data-k="tier">tier <span class="arrow">↕</span></th>
-            <th data-k="category">category <span class="arrow">↕</span></th>
-            <th data-k="trend">trend <span class="arrow">↕</span></th>
-            <th data-k="close">close <span class="arrow">↕</span></th>
-            <th data-k="filter">filter <span class="arrow">↕</span></th>
-            <th data-k="upper">upper <span class="arrow">↕</span></th>
-            <th data-k="lower">lower <span class="arrow">↕</span></th>
-            <th data-k="above_upper">above_upper <span class="arrow">↕</span></th>
-            <th data-k="dual_cross_up">dual_cross_up <span class="arrow">↕</span></th>
-            <th data-k="upper_status">upper_status <span class="arrow">↕</span></th>
-            <th data-k="dual_cross_down_filter">dual_cross_down_filter <span class="arrow">↕</span></th>
-            <th data-k="drop_from_ath_pct">↓ from ATH% <span class="arrow">↕</span></th>
-            <th data-k="from_atl_pct">↑ from ATL% <span class="arrow">↕</span></th>
-            <th data-k="day_ntl_vlm">dayNtlVlm <span class="arrow">↕</span></th>
-            <th data-k="vol_accel">vol_accel <span class="arrow">↕</span></th>
-            <th data-k="mom_score">mom_score <span class="arrow">↕</span></th>
-            <th data-k="mom_rank">mom_rank <span class="arrow">↕</span></th>
+            <th>Symbol</th><th>Tier</th><th>Cat</th><th>Trend</th>
+            <th>Close</th><th>Upper</th><th>Filter</th>
+            <th>upper_status</th><th>dual_cross_up</th>
+            <th>4H trend</th><th>4H cross_up</th>
+            <th>mom_rank</th>
           </tr>
         </thead>
-        <tbody id="tbody"></tbody>
+        <tbody id="entryUniverseBody"></tbody>
       </table>
-      <div class="empty" id="empty" hidden>No rows match filter.</div>
     </div>
   </div>
+</div>
 
-  <!-- DESK -->
-  <div id="deskPanel" class="hidden">
-    <section class="breadth">
-      <div class="breadth-stats">
-        <div class="stat">Total <span class="pct" id="dEq">—</span></div>
-        <div class="stat">Margin view <span id="dNav">—</span></div>
-        <div class="stat">uPnL <span class="g" id="dPnl">—</span></div>
-        <div class="stat" style="color:var(--muted)" id="dTs">—</div>
-      </div>
-      <div class="flags" id="deskSot"></div>
-    </section>
-    <h3 style="margin:12px 0 8px;font-size:0.95rem;color:var(--muted)">Positions</h3>
-    <div class="observe-banner" id="deskExitBanner">suggested only — 1H=Lower(48) · 4H=Filter(72) — no orders</div>
-    <div class="table-wrap"><table><thead><tr>
-      <th>coin</th><th>side</th><th>size</th><th>entry</th><th>value</th><th>uPnL</th><th>lev</th><th>liq</th>
-      <th>1H</th><th>4H</th><th>Nbar</th><th>Mom</th>
-    </tr></thead><tbody id="deskPos"></tbody></table></div>
-    <h3 style="margin:16px 0 8px;font-size:0.95rem;color:var(--muted)">Candidates</h3>
-    <div class="table-wrap"><table><thead><tr>
-      <th>symbol</th><th>trend</th><th>cross</th><th>sleeve</th><th>note</th>
-    </tr></thead><tbody id="deskCand"></tbody></table></div>
+<!-- ═══════════════ RADAR ═══════════════ -->
+<div id="viewRadar" class="hidden">
+  <div class="tf-tabs" id="tfTabs">
+    <button type="button" data-tf="1h">1H</button>
+    <button type="button" data-tf="4h">4H</button>
+    <button type="button" data-tf="1d" class="active">1D</button>
   </div>
-
-  <!-- NARRATIVE -->
-  <div id="narrPanel" class="hidden">
-    <section class="breadth">
-      <div class="breadth-stats">
-        <div class="stat">Watch <span class="pct" id="nWatch">—</span></div>
-        <div class="stat">Bitunix GC <span class="g" id="nBuOk">—</span></div>
-        <div class="stat">cross_up <span class="g" id="nCross">—</span></div>
-        <div class="stat" style="color:var(--muted)">semi-auto · Bitunix</div>
-      </div>
-      <div class="flags" id="narrFlags"></div>
-    </section>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>ticker</th>
-            <th>sector</th>
-            <th>venue</th>
-            <th>trend</th>
-            <th>close</th>
-            <th>upper</th>
-            <th>filter</th>
-            <th>above_upper</th>
-            <th>dual_cross_up</th>
-            <th>last cross</th>
-            <th>↓ ATH%</th>
-            <th>↑ ATL%</th>
-            <th>narrative</th>
-          </tr>
-        </thead>
-        <tbody id="narrBody"></tbody>
-      </table>
-      <div class="empty" id="narrEmpty" hidden>No narrative rows.</div>
+  <section class="breadth-box" id="radarBreadth">
+    <div class="breadth-stats">
+      <div class="stat">Green <span class="g" id="rGCount">—</span></div>
+      <div class="stat">Red <span class="r" id="rRCount">—</span></div>
+      <div class="stat">Green% <span class="pct" id="rGPct">—</span></div>
+      <div class="stat" style="color:var(--muted)">n=<span id="rNCount">—</span></div>
+      <div class="stat" style="color:var(--muted)">tf=<span id="rTfLabel">1d</span></div>
+      <div class="stat" style="color:var(--muted);margin-left:auto;font-size:0.72rem" id="rScanTs">—</div>
     </div>
+    <div class="bar-track"><div class="bar-fill" id="rBarFill"></div></div>
+    <div class="flags" id="rFlagLine"></div>
+  </section>
+  <div class="filters" id="radarFilters">
+    <button type="button" data-f="all" class="active">All</button>
+    <button type="button" data-f="green">Green</button>
+    <button type="button" data-f="red">Red</button>
+    <button type="button" data-f="dual_cross_up">Dual cross up ↑</button>
+    <button type="button" data-f="dual_cross_down_filter">Dual cross down ↓</button>
+    <button type="button" data-f="above_upper">Above upper</button>
   </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th data-k="symbol">Symbol <span class="arrow">↕</span></th>
+          <th data-k="tier">Tier <span class="arrow">↕</span></th>
+          <th data-k="category">Cat <span class="arrow">↕</span></th>
+          <th data-k="trend">Trend <span class="arrow">↕</span></th>
+          <th data-k="close">Close <span class="arrow">↕</span></th>
+          <th data-k="filter">Filter <span class="arrow">↕</span></th>
+          <th data-k="upper">Upper <span class="arrow">↕</span></th>
+          <th data-k="lower">Lower <span class="arrow">↕</span></th>
+          <th data-k="above_upper">Above Upper <span class="arrow">↕</span></th>
+          <th data-k="dual_cross_up">Cross Up <span class="arrow">↕</span></th>
+          <th data-k="upper_status">Upper Status <span class="arrow">↕</span></th>
+          <th data-k="dual_cross_down_filter">Cross Down <span class="arrow">↕</span></th>
+          <th data-k="rvol">RVOL <span class="arrow">↕</span></th>
+          <th data-k="mom_score">mom_score <span class="arrow">↕</span></th>
+          <th data-k="mom_rank">mom_rank <span class="arrow">↕</span></th>
+        </tr>
+      </thead>
+      <tbody id="radarTbody"></tbody>
+    </table>
+    <div class="empty" id="radarEmpty" hidden>No rows match filter.</div>
+  </div>
+</div>
 
-  <footer id="footer">Harbor cockpit · fetch out/desk_daily.json · no orders</footer>
+<!-- ═══════════════ NARRATIVE ═══════════════ -->
+<div id="viewNarrative" class="hidden">
+  <section class="breadth-box">
+    <div class="breadth-stats">
+      <div class="stat">Watch <span class="pct" id="nWatch">—</span></div>
+      <div class="stat">Cross Up <span class="g" id="nCross">—</span></div>
+      <div class="stat" style="color:var(--muted)">Bitunix semi-auto</div>
+    </div>
+    <div class="flags" id="narrFlags"></div>
+  </section>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Ticker</th><th>Sector</th><th>Venue</th>
+          <th>Trend</th><th>Close</th><th>Upper</th><th>Filter</th>
+          <th>Above Upper</th><th>Cross Up</th>
+          <th>↓ATH%</th><th>↑ATL%</th><th>Narrative</th>
+        </tr>
+      </thead>
+      <tbody id="narrBody"></tbody>
+    </table>
+    <div class="empty" id="narrEmpty" hidden>No narrative rows.</div>
+  </div>
+</div>
+
+<!-- ═══════════════ DESK (legacy) ═══════════════ -->
+<div id="viewDesk" class="hidden">
+  <section class="breadth-box">
+    <div class="breadth-stats">
+      <div class="stat">Equity <span class="pct" id="dEq">—</span></div>
+      <div class="stat">uPnL <span class="g" id="dPnl">—</span></div>
+      <div class="stat" style="color:var(--muted)" id="dTs">—</div>
+    </div>
+    <div class="flags" id="deskSot"></div>
+  </section>
+  <div class="observe-banner">suggested only — 1H=Lower(48) · 4H=Filter(72) — no live orders</div>
+  <h3 style="margin:12px 0 8px;font-size:0.95rem;color:var(--muted)">Positions (desk_daily.json)</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Coin</th><th>Side</th><th>Size</th><th>Entry</th>
+        <th>Value</th><th>uPnL</th><th>Lev</th><th>Liq</th>
+        <th>1H Exit</th><th>4H Exit</th>
+      </tr></thead>
+      <tbody id="deskPosBody"></tbody>
+    </table>
+  </div>
+  <h3 style="margin:16px 0 8px;font-size:0.95rem;color:var(--muted)">Candidates</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Symbol</th><th>Trend</th><th>Cross</th><th>Sleeve</th><th>Note</th></tr></thead>
+      <tbody id="deskCandBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<footer id="footer">Harbor cockpit · auto-refresh 60s · no orders</footer>
+
 </main>
 
 <script>
 (function () {
-  const REFRESH_MS = 60000;
-  const MAJORS = new Set(["BTC", "ETH", "SOL", "HYPE", "ZEC"]);
-  const VALID_TFS = ["1h", "4h", "1d"];
-  let view = "cockpit";
-  let tf = "1d";
-  let rows = [];
-  let filter = "all";
-  let sortKey = "mom_score";
-  let sortAsc = false;
-  let lastTs = null;
-  let rightTab = "actions";
+  "use strict";
+
+  const REFRESH_MS  = 60_000;
+  const MAJORS      = new Set(["BTC","ETH","SOL","HYPE","ZEC"]);
+  const VALID_TFS   = ["1h","4h","1d"];
+
+  // ── State ──────────────────────────────────────────────────────────────
+  let view       = "cockpit";
+  let radarTf    = "1d";
+  let radarFilter= "all";
+  let radarSortK = "mom_score";
+  let radarSortA = false;
+
+  // Global radar cache — refreshed every 60s regardless of view
+  const radar = { "1h": null, "4h": null, "1d": null };
+  let deskData  = null;
+  let refreshTimer  = REFRESH_MS / 1000;
+  let refreshActive = false;
 
   const el = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-  function dataUrl(t) { return "out/gc_radar_" + t + ".json"; }
-
-  function fmtUsd(v, digs) {
+  // ── Formatting ──────────────────────────────────────────────────────────
+  function fmtUsd(v, d=2) {
     if (v == null || Number.isNaN(Number(v))) return "—";
     const n = Number(v);
-    const d = digs != null ? digs : (Math.abs(n) >= 100 ? 2 : 2);
-    const s = n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
-    return (n < 0 ? "-$" : "$") + s.replace("-", "");
+    const s = Math.abs(n).toLocaleString(undefined, {minimumFractionDigits:d,maximumFractionDigits:d});
+    return (n < 0 ? "-$" : "$") + s;
   }
-  function fmtPct(v, digs) {
+  function fmtPct(v, d=2) {
     if (v == null || Number.isNaN(Number(v))) return "—";
     const n = Number(v);
-    const s = n.toFixed(digs != null ? digs : 2);
-    return (n > 0 ? "+" : "") + s + "%";
+    return (n > 0 ? "+" : "") + n.toFixed(d) + "%";
   }
   function fmtNum(v) {
-    if (v == null || Number.isNaN(v)) return "—";
-    const n = Number(v);
-    const a = Math.abs(n);
-    if (a >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
-    if (a >= 1) return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
-    return n.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 8 });
+    if (v == null || Number.isNaN(Number(v))) return "—";
+    const n = Number(v), a = Math.abs(n);
+    if (a >= 10000) return n.toLocaleString(undefined, {maximumFractionDigits:0});
+    if (a >= 100)   return n.toLocaleString(undefined, {maximumFractionDigits:2});
+    if (a >= 1)     return n.toLocaleString(undefined, {minimumFractionDigits:2,maximumFractionDigits:4});
+    return n.toLocaleString(undefined, {minimumFractionDigits:4,maximumFractionDigits:8});
   }
-  function boolCell(v, bad) {
-    if (v) return bad ? '<span class="bool-bad">true</span>' : '<span class="bool-y">true</span>';
-    return '<span class="bool-n">false</span>';
+  function boolCell(v, isBad=false) {
+    if (v) return isBad ? '<span class="bool-bad">✓</span>' : '<span class="bool-y">✓</span>';
+    return '<span class="bool-n">—</span>';
   }
-  function signedClass(n) { return Number(n) >= 0 ? "pos" : "neg"; }
+  function signedCls(n) { return Number(n) >= 0 ? "pos" : "neg"; }
 
-  function showView(v) {
-    view = v;
-    el("cockpitPanel").classList.toggle("hidden", v !== "cockpit");
-    el("radarPanel").classList.toggle("hidden", v !== "radar");
-    el("deskPanel").classList.toggle("hidden", v !== "desk");
-    el("narrPanel").classList.toggle("hidden", v !== "narrative");
-    document.querySelectorAll("#mainTabs button").forEach((b) => {
-      b.classList.toggle("active", b.dataset.view === v);
-    });
+  // ── Age string for scan timestamps ──────────────────────────────────────
+  function ageStr(isoTs) {
+    if (!isoTs) return "—";
+    try {
+      const diff = (Date.now() - new Date(isoTs).getTime()) / 60000;
+      if (diff < 0) return "—";
+      if (diff < 60) return Math.round(diff) + "m ago";
+      if (diff < 1440) return (diff/60).toFixed(1) + "h ago";
+      return (diff/1440).toFixed(1) + "d ago";
+    } catch { return "—"; }
   }
-
-  /* ——— canvas helpers ——— */
-  function drawSpark(canvas, values, color) {
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    const w = canvas.width, h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-    const vals = (values || []).map(Number).filter((x) => !Number.isNaN(x));
-    if (vals.length < 2) {
-      ctx.strokeStyle = "#2a3545";
-      ctx.beginPath();
-      ctx.moveTo(0, h / 2);
-      ctx.lineTo(w, h / 2);
-      ctx.stroke();
-      return;
-    }
-    const min = Math.min(...vals);
-    const max = Math.max(...vals);
-    const pad = (max - min) * 0.08 || 1;
-    const lo = min - pad, hi = max + pad;
-    ctx.strokeStyle = color || "#38bdf8";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    vals.forEach((v, i) => {
-      const x = (i / (vals.length - 1)) * (w - 2) + 1;
-      const y = h - ((v - lo) / (hi - lo)) * (h - 4) - 2;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    // fill
-    ctx.lineTo(w - 1, h);
-    ctx.lineTo(1, h);
-    ctx.closePath();
-    ctx.fillStyle = (color || "#38bdf8") + "22";
-    ctx.fill();
+  function ageCls(isoTs, warnMin=25, errMin=90) {
+    if (!isoTs) return "err";
+    const diff = (Date.now() - new Date(isoTs).getTime()) / 60000;
+    if (diff < warnMin) return "ok";
+    if (diff < errMin) return "warn";
+    return "err";
   }
 
-  function drawBars(canvas, items, colorPos, colorNeg) {
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    const w = canvas.width, h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-    const vals = items.map((x) => Number(x.uPnl) || 0);
-    if (!vals.length) return;
-    const maxAbs = Math.max(...vals.map(Math.abs), 0.01);
-    const n = vals.length;
-    const gap = 4;
-    const bw = Math.max(4, (w - gap * (n + 1)) / n);
-    const mid = h / 2;
-    vals.forEach((v, i) => {
-      const x = gap + i * (bw + gap);
-      const bh = (Math.abs(v) / maxAbs) * (h / 2 - 4);
-      ctx.fillStyle = v >= 0 ? (colorPos || "#22c55e") : (colorNeg || "#ef4444");
-      if (v >= 0) ctx.fillRect(x, mid - bh, bw, bh);
-      else ctx.fillRect(x, mid, bw, bh);
-    });
-    ctx.strokeStyle = "#2a3545";
-    ctx.beginPath();
-    ctx.moveTo(0, mid);
-    ctx.lineTo(w, mid);
-    ctx.stroke();
-  }
-
+  // ── Canvas helpers ─────────────────────────────────────────────────────
   function drawDonut(canvas, parts) {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    const w = canvas.width, h = canvas.height;
-    const cx = w / 2, cy = h / 2;
-    const r = Math.min(w, h) / 2 - 2;
-    const rIn = r * 0.62;
-    ctx.clearRect(0, 0, w, h);
-    const total = parts.reduce((s, p) => s + Math.max(0, p.value), 0) || 1;
-    let a = -Math.PI / 2;
-    parts.forEach((p) => {
-      const slice = (Math.max(0, p.value) / total) * Math.PI * 2;
+    const {width:w, height:h} = canvas;
+    const cx = w/2, cy = h/2, r = Math.min(w,h)/2-2, rIn = r*0.62;
+    ctx.clearRect(0,0,w,h);
+    const total = parts.reduce((s,p) => s + Math.max(0, p.v), 0) || 1;
+    let a = -Math.PI/2;
+    parts.forEach(p => {
+      const slice = (Math.max(0,p.v)/total)*Math.PI*2;
       ctx.beginPath();
-      ctx.arc(cx, cy, r, a, a + slice);
-      ctx.arc(cx, cy, rIn, a + slice, a, true);
+      ctx.arc(cx,cy,r,a,a+slice);
+      ctx.arc(cx,cy,rIn,a+slice,a,true);
       ctx.closePath();
-      ctx.fillStyle = p.color;
-      ctx.fill();
+      ctx.fillStyle = p.c; ctx.fill();
       a += slice;
     });
-    // hole bg
-    ctx.beginPath();
-    ctx.arc(cx, cy, rIn - 0.5, 0, Math.PI * 2);
-    ctx.fillStyle = "#11151c";
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy,rIn-0.5,0,Math.PI*2);
+    ctx.fillStyle = "#11151c"; ctx.fill();
   }
 
-  function drawCompareCurves(canvas, curves) {
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    const w = canvas.width, h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "#11151c";
-    ctx.fillRect(0, 0, w, h);
-    if (!curves || !curves.labels || !curves.labels.length) {
-      ctx.fillStyle = "#8b949e";
-      ctx.font = "12px sans-serif";
-      ctx.fillText("No curve data yet — run build_equity_curves.py", 16, h / 2);
+  // ── View switching ─────────────────────────────────────────────────────
+  const VIEWS = ["cockpit","entry","radar","narrative","desk"];
+  function showView(v) {
+    view = v;
+    VIEWS.forEach(id => el("view"+id[0].toUpperCase()+id.slice(1)).classList.toggle("hidden", id !== v));
+    document.querySelectorAll("#mainTabs button").forEach(b => b.classList.toggle("active", b.dataset.view === v));
+    renderCurrentView();
+  }
+
+  // ── Global radar fetch (background) ───────────────────────────────────
+  async function fetchRadarTf(tf) {
+    try {
+      const r = await fetch("out/gc_radar_"+tf+".json?t="+Date.now(), {cache:"no-store"});
+      if (!r.ok) return null;
+      return await r.json();
+    } catch { return null; }
+  }
+
+  async function refreshAllRadar() {
+    refreshActive = true;
+    el("refreshIcon").classList.add("spinning");
+    el("frMeta").textContent = "Refreshing…";
+    const [d1h, d4h, d1d] = await Promise.all([
+      fetchRadarTf("1h"), fetchRadarTf("4h"), fetchRadarTf("1d")
+    ]);
+    if (d1h) radar["1h"] = d1h;
+    if (d4h) radar["4h"] = d4h;
+    if (d1d) radar["1d"] = d1d;
+    updateHeaderBreadth();
+    updateFreshness();
+    renderCurrentView();
+    el("refreshIcon").classList.remove("spinning");
+    el("frMeta").textContent = "Last refresh: "+new Date().toLocaleTimeString("en-GB",{timeZone:"Asia/Hong_Kong"})+" HKT";
+    refreshActive = false;
+  }
+
+  async function refreshDeskData() {
+    try {
+      const r = await fetch("out/desk_daily.json?t="+Date.now(), {cache:"no-store"});
+      if (r.ok) deskData = await r.json();
+    } catch {}
+  }
+
+  // ── Header breadth ─────────────────────────────────────────────────────
+  function updateHeaderBreadth() {
+    VALID_TFS.forEach(tf => {
+      const d = radar[tf];
+      const b = d && d.breadth;
+      const pct = b ? Number(b.green_pct) : null;
+      el("bv"+tf).textContent = pct != null ? pct.toFixed(1)+"%" : "—";
+      el("bv"+tf).className = "bf-val " + (pct == null ? "" : pct >= 55 ? "bull" : pct <= 45 ? "bear" : "");
+      el("bb"+tf).style.width = (pct != null ? Math.max(0,Math.min(100,pct)) : 0)+"%";
+    });
+    // BTC 1D
+    const d1d = radar["1d"];
+    const btc = d1d && Array.isArray(d1d.rows) ? d1d.rows.find(r => r.symbol === "BTC") : null;
+    if (btc) {
+      el("btcTrend").textContent = btc.trend || "—";
+      el("btcTrend").className = "bf-val "+(btc.trend==="Green"?"bull":btc.trend==="Red"?"bear":"");
+      const sub = [btc.above_upper?"↑UPPER":"", btc.dual_cross_up?"CROSS":""].filter(Boolean).join(" ") || "@"+fmtNum(btc.close);
+      el("btcSub").textContent = sub;
+    } else {
+      el("btcTrend").textContent = "—";
+      el("btcSub").textContent = "—";
+    }
+  }
+
+  // ── Freshness bar ─────────────────────────────────────────────────────
+  function updateFreshness() {
+    VALID_TFS.forEach(tf => {
+      const d = radar[tf];
+      const ts = d && d.ts;
+      const span = el("fr"+tf);
+      if (!span) return;
+      span.textContent = ts ? ageStr(ts) : "—";
+      span.className = ts ? ageCls(ts, tf==="1d"?1200:25, tf==="1d"?2880:90) : "err";
+    });
+  }
+
+  // ── HKT Clock ─────────────────────────────────────────────────────────
+  function tickClock() {
+    const now = new Date();
+    el("hktClock").textContent = now.toLocaleTimeString("en-GB",{timeZone:"Asia/Hong_Kong",hour12:false})+" HKT";
+    refreshTimer--;
+    if (refreshTimer <= 0) refreshTimer = REFRESH_MS/1000;
+    el("refreshCountdown").textContent = refreshTimer+"s";
+  }
+  setInterval(tickClock, 1000);
+
+  // ── Refresh loop ─────────────────────────────────────────────────────
+  async function fullRefresh() {
+    refreshTimer = REFRESH_MS/1000;
+    await Promise.all([refreshAllRadar(), refreshDeskData()]);
+  }
+  setInterval(fullRefresh, REFRESH_MS);
+
+  // ── Render current view ─────────────────────────────────────────────
+  function renderCurrentView() {
+    if (view === "cockpit")   renderCockpit();
+    else if (view === "entry")     renderEntry();
+    else if (view === "radar")     renderRadar();
+    else if (view === "narrative") renderNarrative();
+    else if (view === "desk")      renderDesk();
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // COCKPIT
+  // ══════════════════════════════════════════════════════════
+  function renderCockpit() {
+    const d = deskData;
+    const a = d && d.account || {};
+    const pos = d && d.positions || [];
+
+    const eq     = Number(a.equity ?? a.total_eq ?? a.spot_usdc) || 0;
+    const upnl   = Number(a.uPnL_sum) || 0;
+    const margin = Number(a.margin_used) || 0;
+    const free   = Number(a.spot_usdc_free) || 0;
+
+    el("ckEq").textContent = fmtUsd(eq);
+    el("ckEq").className = "kpi-big "+(eq ? signedCls(upnl) : "");
+    el("ckUpnl").textContent = (upnl>=0?"+":"")+fmtUsd(upnl);
+    el("ckUpnl").className = "v "+signedCls(upnl);
+    el("ckMargin").textContent = fmtUsd(margin);
+    el("ckFree").textContent = fmtUsd(free);
+    el("ckPosCount").textContent = pos.length;
+
+    let worst = null;
+    pos.forEach(p => { if (!worst || Number(p.uPnL)<Number(worst.uPnL)) worst=p; });
+    if (worst) {
+      el("ckWorst").textContent = worst.coin+" "+fmtUsd(worst.uPnL);
+      el("ckWorst").className = "v "+signedCls(worst.uPnL);
+    } else { el("ckWorst").textContent = "—"; }
+
+    // Multi-TF breadth
+    VALID_TFS.forEach(tf => {
+      const b = radar[tf] && radar[tf].breadth;
+      const pct = b ? Number(b.green_pct) : null;
+      el("ck_bf"+tf).style.width = (pct!=null ? Math.max(0,Math.min(100,pct)):0)+"%";
+      el("ck_bv"+tf).textContent = pct!=null ? pct.toFixed(1)+"%" : "—";
+      el("ck_bv"+tf).className = "btf-val "+(pct!=null ? (pct>=55?"pos":pct<=45?"neg":"accent") : "");
+      el("ck_bc"+tf).textContent = b ? (b.green_count+"G "+b.red_count+"R n="+b.n) : "—";
+    });
+
+    // Donuts
+    const longs  = pos.filter(p => String(p.side||"").toUpperCase()==="LONG");
+    const shorts = pos.filter(p => String(p.side||"").toUpperCase()==="SHORT");
+    drawDonut(el("donutLong"), [
+      {v: longs.length||0.001, c:"#22c55e"},
+      {v: shorts.length,        c:"#ef4444"},
+    ]);
+    el("donutLongN").textContent = String(longs.length);
+    el("legLong").textContent  = "Long "+longs.length;
+    el("legShort").textContent = "Short "+shorts.length;
+
+    // Build radar lookup maps for position overlay
+    const gcMap1h = {};
+    const gcMap4h = {};
+    if (radar["1h"] && radar["1h"].rows) radar["1h"].rows.forEach(r => { gcMap1h[r.symbol] = r; });
+    if (radar["4h"] && radar["4h"].rows) radar["4h"].rows.forEach(r => { gcMap4h[r.symbol] = r; });
+
+    // Positions table with GC overlay
+    el("ckPosHead").textContent = pos.length ? "("+pos.length+")" : "";
+    el("ckPosBody").innerHTML = pos.length
+      ? pos.map(p => {
+          const coin = p.coin || "";
+          const side = String(p.side||"").toUpperCase();
+          const uPnL = Number(p.uPnL) || 0;
+          const cls  = signedCls(uPnL);
+          const r1h  = gcMap1h[coin] || gcMap1h[coin+"-PERP"] || null;
+          const r4h  = gcMap4h[coin] || gcMap4h[coin+"-PERP"] || null;
+
+          // GC cell
+          const gc1hTrend = r1h ? r1h.trend : "—";
+          const gc4hTrend = r4h ? r4h.trend : "—";
+          const gc1hCls   = gc1hTrend==="Green"?"gc-g":gc1hTrend==="Red"?"gc-r":"gc-m";
+          const gc4hCls   = gc4hTrend==="Green"?"gc-g":gc4hTrend==="Red"?"gc-r":"gc-m";
+          const gcCell = `<div class="gc-cell"><span class="gc-1h ${gc1hCls}">1H ${gc1hTrend}</span><span class="gc-4h ${gc4hCls}">4H ${gc4hTrend}</span></div>`;
+
+          // SL = 4H filter
+          const sl4h   = r4h ? r4h.filter : (p.h4_filter ?? null);
+          const slText = sl4h != null ? fmtNum(sl4h) : "—";
+          const entry  = Number(p.entry) || 0;
+          const slGapPct = sl4h && entry ? ((Number(sl4h)-entry)/entry*100) : null;
+          const slGapText = slGapPct != null ? fmtPct(slGapPct,2) : "—";
+          const slGapCls  = slGapPct != null ? (slGapPct < -8 ? "neg" : slGapPct < -3 ? "amber" : "pos") : "";
+
+          // Exit signal from tier SoT
+          // Mega/Large exit: 4H close < 4H filter → check if close < filter
+          // Small/Tiny exit: 1H close < 1H lower
+          let exitSignal = "HOLD";
+          let rowCls = "";
+          const tier = p.tier || "";
+          if (r4h && (tier==="mega"||tier==="large")) {
+            const close4h = r4h.close, filt4h = r4h.filter;
+            if (close4h && filt4h && close4h < filt4h) { exitSignal="EXIT 4H"; rowCls="hl-down"; }
+            else if (gc4hTrend==="Red") { exitSignal="WATCH"; rowCls="hl-watch"; }
+          } else if (r1h && (tier==="small"||tier==="tiny")) {
+            const close1h = r1h.close, lower1h = r1h.lower;
+            if (close1h && lower1h && close1h < lower1h) { exitSignal="EXIT 1H"; rowCls="hl-down"; }
+            else if (gc1hTrend==="Red") { exitSignal="WATCH"; rowCls="hl-watch"; }
+          } else if (gc4hTrend==="Red"||gc1hTrend==="Red") {
+            exitSignal="WATCH"; rowCls="hl-watch";
+          }
+
+          const sigBadge = exitSignal.startsWith("EXIT")
+            ? `<span class="exit-badge">${exitSignal}</span>`
+            : exitSignal==="WATCH"
+              ? `<span class="watch-badge">WATCH</span>`
+              : `<span class="hold-badge">HOLD</span>`;
+
+          return `<tr class="${rowCls}">
+            <td><strong>${esc(coin)}</strong></td>
+            <td class="${side==="LONG"?"pos":"neg"}">${side}</td>
+            <td>${p.size??p.sz??"—"}</td>
+            <td>${fmtNum(p.entry)}</td>
+            <td>${fmtUsd(p.positionValue)}</td>
+            <td class="${cls}">${fmtUsd(uPnL)}</td>
+            <td>${p.leverage??"—"}x</td>
+            <td>${gcCell}</td>
+            <td class="sl-cell">${slText}</td>
+            <td class="${slGapCls}">${slGapText}</td>
+            <td>${sigBadge}</td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="11" style="color:var(--muted);text-align:center;padding:20px">No open positions</td></tr>`;
+
+    // Entry candidates from 1D radar
+    const d1d = radar["1d"];
+    const d4h = radar["4h"];
+    const d4hMap = {};
+    if (d4h && d4h.rows) d4h.rows.forEach(r => { d4hMap[r.symbol] = r; });
+
+    const baseCands   = d1d && d1d.flags && d1d.flags.dual_cross_up || [];
+    const chaseCands  = [];
+    if (d1d && d1d.rows) {
+      d1d.rows.filter(r => r.trend==="Green").forEach(r => {
+        const r4 = d4hMap[r.symbol];
+        if (r4 && r4.dual_cross_up) chaseCands.push(r);
+      });
+    }
+
+    el("entryCount").textContent = baseCands.length;
+    el("chaseCount").textContent = chaseCands.length;
+
+    const rowOf1d = (sym) => d1d && d1d.rows ? d1d.rows.find(r => r.symbol===sym) : null;
+    el("ckCandBase").innerHTML = baseCands.length
+      ? baseCands.map(sym => {
+          const row = rowOf1d(sym);
+          const tier = (row&&row.tier||"tiny").toLowerCase();
+          return `<div class="cand-item">
+            <span class="cand-coin">${esc(sym)}</span>
+            <span class="cand-tier tier-${tier}">${tier}</span>
+            <span class="cand-type">BASE</span>
+            <span class="cand-price">${row?fmtNum(row.close):"—"}</span>
+          </div>`;
+        }).join("")
+      : '<div class="empty-hint">No 1D dual_cross_up</div>';
+
+    el("ckCandChase").innerHTML = chaseCands.length
+      ? chaseCands.slice(0,20).map(row => {
+          const tier = (row.tier||"tiny").toLowerCase();
+          return `<div class="cand-item">
+            <span class="cand-coin">${esc(row.symbol)}</span>
+            <span class="cand-tier tier-${tier}">${tier}</span>
+            <span class="cand-type">CHASE</span>
+            <span class="cand-price">${fmtNum(row.close)}</span>
+          </div>`;
+        }).join("")
+      : '<div class="empty-hint">No 4H cross_up on 1D green</div>';
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ENTRY
+  // ══════════════════════════════════════════════════════════
+  function renderEntry() {
+    const d1d = radar["1d"];
+    const d4h = radar["4h"];
+    if (!d1d) { el("baseEntryList").innerHTML='<div class="empty">1D radar not loaded</div>'; return; }
+
+    el("entryTsLabel").textContent = "1D scan: "+(d1d.ts ? ageStr(d1d.ts) : "—");
+
+    const d4hMap = {};
+    if (d4h && d4h.rows) d4h.rows.forEach(r => { d4hMap[r.symbol] = r; });
+
+    // Base entries
+    const baseCross = d1d.flags && d1d.flags.dual_cross_up || [];
+    el("baseEntryBadge").textContent = baseCross.length;
+    el("baseEntryList").innerHTML = baseCross.length
+      ? baseCross.map(sym => {
+          const row = d1d.rows ? d1d.rows.find(r => r.symbol===sym) : null;
+          const tier = (row&&row.tier||"tiny").toLowerCase();
+          const cat  = row&&row.category||"";
+          return `<div class="entry-row">
+            <span class="er-coin">${esc(sym)}</span>
+            <span class="cand-tier tier-${tier}">${tier}</span>
+            <span class="cat-${cat}" style="font-size:0.68rem">${cat}</span>
+            <span class="er-price">${row?fmtNum(row.upper):"—"}</span>
+            <span class="er-note">1D cross_up · fill N+1 · entry=Upper ${row&&row.upper?">"+fmtNum(row.upper):""}</span>
+          </div>`;
+        }).join("")
+      : '<div class="empty">No 1D dual_cross_up today</div>';
+
+    // Chase entries
+    const chaseCands = [];
+    d1d.rows.filter(r => r.trend==="Green").forEach(r => {
+      const r4 = d4hMap[r.symbol];
+      if (r4 && r4.dual_cross_up) chaseCands.push({d1:r, d4:r4});
+    });
+    el("chaseEntryBadge").textContent = chaseCands.length;
+    el("chaseEntryList").innerHTML = chaseCands.length
+      ? chaseCands.slice(0,30).map(({d1,d4}) => {
+          const tier = (d1.tier||"tiny").toLowerCase();
+          return `<div class="entry-row">
+            <span class="er-coin">${esc(d1.symbol)}</span>
+            <span class="cand-tier tier-${tier}">${tier}</span>
+            <span class="cand-type" style="font-size:0.65rem">CHASE</span>
+            <span class="er-price">4H:${fmtNum(d4.upper)}</span>
+            <span class="er-note">1D green · 4H cross_up · entry=4H Upper ${d4.upper?">"+fmtNum(d4.upper):""}</span>
+          </div>`;
+        }).join("")
+      : '<div class="empty">No chase candidates</div>';
+
+    // Universe table (1D green, sorted by mom_rank)
+    const greenRows = d1d.rows
+      .filter(r => r.trend==="Green")
+      .sort((a,b) => (a.mom_rank||999)-(b.mom_rank||999));
+    el("entryUniverseBody").innerHTML = greenRows.map(r => {
+      const r4  = d4hMap[r.symbol];
+      const usCls = "us-"+(r.upper_status||"below");
+      return `<tr class="${r.dual_cross_up?"hl-up":""}">
+        <td>${esc(r.symbol)}</td>
+        <td class="tier-${(r.tier||"tiny").toLowerCase()}">${r.tier||"—"}</td>
+        <td class="cat-${r.category||""}">${r.category||"—"}</td>
+        <td class="trend-g">Green</td>
+        <td>${fmtNum(r.close)}</td>
+        <td>${fmtNum(r.upper)}</td>
+        <td>${fmtNum(r.filter)}</td>
+        <td class="${usCls}">${r.upper_status||"—"}</td>
+        <td>${boolCell(r.dual_cross_up)}</td>
+        <td class="${r4&&r4.trend==="Green"?"trend-g":r4&&r4.trend==="Red"?"trend-r":""}">
+          ${r4?r4.trend:"—"}
+        </td>
+        <td>${boolCell(r4&&r4.dual_cross_up)}</td>
+        <td>${r.mom_rank??r.mom_score??"—"}</td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="12" class="empty">No 1D green rows</td></tr>';
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // RADAR
+  // ══════════════════════════════════════════════════════════
+  function renderRadar() {
+    const d = radar[radarTf];
+    if (!d) {
+      el("radarTbody").innerHTML = '<tr><td colspan="15" class="empty">Loading…</td></tr>';
       return;
     }
-    const series = [
-      { key: "equity_pct", color: "#38bdf8", label: "HL Equity" },
-      { key: "btc_pct", color: "#f59e0b", label: "BTC" },
-      { key: "bitunix_pct", color: "#a78bfa", label: "Bitunix BTC" },
-    ];
-    let min = Infinity, max = -Infinity;
-    series.forEach((s) => {
-      (curves[s.key] || []).forEach((v) => {
-        if (v == null || Number.isNaN(Number(v))) return;
-        min = Math.min(min, Number(v));
-        max = Math.max(max, Number(v));
-      });
+    // Breadth
+    const b = d.breadth || {};
+    el("rGCount").textContent = b.green_count??"—";
+    el("rRCount").textContent = b.red_count??"—";
+    el("rGPct").textContent   = b.green_pct!=null ? Number(b.green_pct).toFixed(2)+"%" : "—";
+    el("rNCount").textContent = b.n??"—";
+    el("rTfLabel").textContent= radarTf;
+    el("rBarFill").style.width = (b.green_pct!=null ? Math.max(0,Math.min(100,b.green_pct)):0)+"%";
+    el("rScanTs").textContent  = d.ts ? ageStr(d.ts) : "—";
+    const f = d.flags||{};
+    const up = (f.dual_cross_up||[]).map(s=>`<span class="chip up">${esc(s)}</span>`).join(" ")||"<span>—</span>";
+    const dn = (f.dual_cross_down_filter||[]).map(s=>`<span class="chip down">${esc(s)}</span>`).join(" ")||"<span>—</span>";
+    el("rFlagLine").innerHTML = `cross_up: ${up} &nbsp; cross_down: ${dn}`;
+
+    // Table
+    let rows = Array.isArray(d.rows) ? [...d.rows] : [];
+    switch (radarFilter) {
+      case "green": rows=rows.filter(r=>r.trend==="Green"); break;
+      case "red":   rows=rows.filter(r=>r.trend==="Red"); break;
+      case "dual_cross_up": rows=rows.filter(r=>r.dual_cross_up); break;
+      case "dual_cross_down_filter": rows=rows.filter(r=>r.dual_cross_down_filter); break;
+      case "above_upper": rows=rows.filter(r=>r.above_upper); break;
+    }
+    rows.sort((a,b2) => {
+      let va=a[radarSortK], vb=b2[radarSortK];
+      if (typeof va==="boolean") { va=va?1:0; vb=vb?1:0; }
+      if (typeof va==="string") { const c=String(va).localeCompare(String(vb||""),undefined,{sensitivity:"base"}); return radarSortA?c:-c; }
+      if (va==null) va=-Infinity;
+      if (vb==null) vb=-Infinity;
+      return radarSortA ? va-vb : vb-va;
     });
-    if (!Number.isFinite(min) || !Number.isFinite(max)) { min = -1; max = 1; }
-    if (min === max) { min -= 1; max += 1; }
-    const pad = (max - min) * 0.12 || 1;
-    const lo = min - pad, hi = max + pad;
-    const left = 44, right = 12, top = 12, bottom = 28;
-    const pw = w - left - right, ph = h - top - bottom;
-    // zero line
-    const y0 = top + (1 - (0 - lo) / (hi - lo)) * ph;
-    ctx.strokeStyle = "#2a3545";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(left, y0);
-    ctx.lineTo(left + pw, y0);
-    ctx.stroke();
-    // axes labels
-    ctx.fillStyle = "#8b949e";
-    ctx.font = "10px monospace";
-    ctx.fillText(hi.toFixed(1) + "%", 4, top + 10);
-    ctx.fillText(lo.toFixed(1) + "%", 4, top + ph);
-    const n = curves.labels.length;
-    series.forEach((s) => {
-      const vals = curves[s.key] || [];
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      let started = false;
-      for (let i = 0; i < n; i++) {
-        const v = vals[i];
-        if (v == null || Number.isNaN(Number(v))) { started = false; continue; }
-        const x = left + (n === 1 ? pw / 2 : (i / (n - 1)) * pw);
-        const y = top + (1 - (Number(v) - lo) / (hi - lo)) * ph;
-        if (!started) { ctx.moveTo(x, y); started = true; }
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    });
-    // x labels ends
-    if (n) {
-      ctx.fillStyle = "#8b949e";
-      ctx.fillText(String(curves.labels[0]).slice(5), left, h - 8);
-      ctx.fillText(String(curves.labels[n - 1]).slice(5), left + pw - 36, h - 8);
-    }
-  }
-
-  /* ——— Cockpit ——— */
-  async function loadCockpit() {
-    showView("cockpit");
-    el("footer").innerHTML = 'Cockpit · <code>out/desk_daily.json</code> + charts · no orders';
-    try {
-      const [dR, gR] = await Promise.all([
-        fetch("out/desk_daily.json?t=" + Date.now(), { cache: "no-store" }),
-        fetch("out/gc_radar_1d.json?t=" + Date.now(), { cache: "no-store" }).catch(() => null),
-      ]);
-      if (!dR.ok) throw new Error("desk HTTP " + dR.status);
-      const d = await dR.json();
-      let radar = null;
-      if (gR && gR.ok) radar = await gR.json();
-
-      const a = d.account || {};
-      const pos = d.positions || [];
-      const breadth = d.breadth || (d.freshness && d.freshness.breadth_1d) || {};
-      const eq = Number(a.equity != null ? a.equity : (a.total_eq != null ? a.total_eq : a.spot_usdc)) || 0;
-      const upnl = Number(a.uPnl_sum) || 0;
-      const margin = Number(a.margin_used) || 0;
-      const free = Number(a.spot_usdc_free) || 0;
-      const ddPct = eq ? (upnl / eq) * 100 : 0;
-      const expPct = eq ? (margin / eq) * 100 : 0;
-
-      let worst = null;
-      pos.forEach((p) => {
-        if (!worst || Number(p.uPnl) < Number(worst.uPnl)) worst = p;
-      });
-
-      el("ckEq").textContent = fmtUsd(eq);
-      el("ckEq").className = "kpi-big " + signedClass(upnl);
-      el("ckUpnl").textContent = (upnl >= 0 ? "+" : "") + fmtUsd(upnl);
-      el("ckUpnl").className = "v " + signedClass(upnl);
-      el("ckMargin").textContent = fmtUsd(margin);
-      el("ckFree").textContent = fmtUsd(free);
-      el("ckBreadth").textContent = breadth.green_pct != null ? Number(breadth.green_pct).toFixed(2) + "%" : "—";
-      if (worst) {
-        el("ckWorst").textContent = worst.coin + " " + fmtUsd(worst.uPnl);
-        el("ckWorst").className = "v " + signedClass(worst.uPnl);
-      } else {
-        el("ckWorst").textContent = "—";
-      }
-      el("ckNav").textContent = fmtUsd(a.perp_nav);
-      el("ckSpot").textContent = fmtUsd(a.spot_usdc);
-      el("ckNtl").textContent = fmtUsd(a.total_ntl_pos);
-      el("ckAddr").textContent = a.address_short || "—";
-
-      el("ckWBreadth").textContent = breadth.green_pct != null ? Number(breadth.green_pct).toFixed(1) + "%" : "—";
-      el("ckWBreadthSub").textContent = (breadth.green_count ?? "—") + "G / " + (breadth.red_count ?? "—") + "R · n=" + (breadth.n ?? "—");
-
-      // BTC regime from desk candidates.majors or radar
-      let btc = (d.candidates && d.candidates.majors && d.candidates.majors.BTC) || null;
-      if (!btc && radar && Array.isArray(radar.rows)) {
-        btc = radar.rows.find((r) => r.symbol === "BTC") || null;
-      }
-      if (btc) {
-        const trend = btc.trend || "—";
-        el("ckWBtc").textContent = trend;
-        el("ckWBtc").className = "w-val " + (trend === "Green" ? "pos" : (trend === "Red" ? "neg" : ""));
-        const bits = [];
-        if (btc.above_upper) bits.push("Above Upper");
-        if (btc.chase_blocked) bits.push("chase blocked");
-        if (btc.close != null) bits.push("@" + fmtNum(btc.close));
-        el("ckWBtcSub").textContent = bits.join(" · ") || "—";
-      } else {
-        el("ckWBtc").textContent = "—";
-        el("ckWBtcSub").textContent = "no BTC row";
-      }
-
-      el("ckWExp").textContent = expPct.toFixed(1) + "%";
-      el("ckWExpSub").textContent = fmtUsd(margin) + " / " + fmtUsd(eq);
-      el("ckWDd").textContent = fmtPct(ddPct);
-      el("ckWDd").className = "w-val " + signedClass(ddPct);
-
-      el("ckChartTs").textContent = d.ts_hkt || d.ts || "—";
-      el("deskClock").innerHTML = "Desk <strong>" + (d.ts_hkt || "—") + "</strong>";
-
-      // status pill
-      const fresh = d.freshness || {};
-      const pill = el("statusPill");
-      if (fresh["1d_ok"] === false) {
-        pill.textContent = "STALE";
-        pill.className = "status-pill warn";
-      } else {
-        pill.textContent = "DRY_RUN";
-        pill.className = "status-pill";
-      }
-
-      // curves: equity vs BTC vs Bitunix
-      try {
-        const cR = await fetch("out/curves_compare.json?t=" + Date.now(), { cache: "no-store" });
-        if (cR.ok) {
-          const curves = await cR.json();
-          drawCompareCurves(el("ckCurve"), curves);
-          if (curves.note) el("ckCurveNote").textContent = curves.note;
-        } else {
-          drawCompareCurves(el("ckCurve"), null);
-        }
-      } catch (e) {
-        drawCompareCurves(el("ckCurve"), null);
-      }
-
-      const gPct = Number(breadth.green_pct) || 0;
-      drawSpark(el("sparkBreadth"), [40, 55, 62, 70, 75, 80, gPct], "#22c55e");
-      drawSpark(el("sparkExp"), [20, 30, 45, 50, expPct], "#38bdf8");
-      drawSpark(el("sparkDd"), [0, -0.2, -0.5, -0.4, ddPct], ddPct >= 0 ? "#22c55e" : "#ef4444");
-
-      // donuts
-      const longs = pos.filter((p) => String(p.side || "").toUpperCase() === "LONG");
-      const shorts = pos.filter((p) => String(p.side || "").toUpperCase() === "SHORT");
-      const own = pos.filter((p) => !MAJORS.has(String(p.coin || "").toUpperCase()));
-      const maj = pos.filter((p) => MAJORS.has(String(p.coin || "").toUpperCase()));
-      drawDonut(el("donutLong"), [
-        { value: longs.length || 0.0001, color: "#22c55e" },
-        { value: shorts.length, color: "#ef4444" },
-      ]);
-      el("donutLongN").textContent = String(longs.length);
-      el("legLong").textContent = "Long (" + (pos.length ? ((longs.length / pos.length) * 100).toFixed(0) : 0) + "%) · " + longs.length;
-      el("legShort").textContent = "Short (" + (pos.length ? ((shorts.length / pos.length) * 100).toFixed(0) : 0) + "%) · " + shorts.length;
-
-      drawDonut(el("donutSleeve"), [
-        { value: own.length || 0.0001, color: "#38bdf8" },
-        { value: maj.length || 0.0001, color: "#f59e0b" },
-      ]);
-      el("donutSleeveN").textContent = String(pos.length);
-      el("legOwn").textContent = "Own " + own.length + " · " + own.map((p) => p.coin).join(", ");
-      el("legMaj").textContent = "Majors " + maj.length + " · " + maj.map((p) => p.coin).join(", ");
-
-      // right panels
-      const actions = d.actions_this_run || [];
-      el("rtabActions").innerHTML = actions.length
-        ? actions.map((act) => {
-            const name = act.action || act.type || "action";
-            const note = act.note || act.reason || act.result || JSON.stringify(act).slice(0, 120);
-            return `<div class="action-item"><div class="act">${escapeHtml(name)}</div><div class="note">${escapeHtml(String(note))}</div></div>`;
-          }).join("")
-        : '<div class="empty-hint">No actions this run</div>';
-
-      const exCell = (ex) => {
-        if (!ex || ex.px == null) return "—";
-        const pnl = Number(ex.pnl_usd);
-        const cls = pnl >= 0 ? "pos" : "neg";
-        const s = pnl >= 0 ? "+" : "−";
-        return `<span class="${cls}">${s}$${Math.abs(pnl).toFixed(2)}</span>`;
-      };
-      el("ckPosTable").innerHTML = pos.length
-        ? pos.map((p) => {
-            const cls = signedClass(p.uPnl);
-            const side = String(p.side || "").toUpperCase();
-            const se = p.suggested_exits || {};
-            const sl = p.h4_filter != null ? fmtNum(p.h4_filter) : "—";
-            return `<tr>
-              <td><strong>${escapeHtml(p.coin)}</strong></td>
-              <td class="${side === "LONG" ? "pos" : "neg"}">${side}</td>
-              <td>${p.size ?? p.sz ?? "—"}</td>
-              <td>${fmtNum(p.entry)}</td>
-              <td>${fmtUsd(p.positionValue)}</td>
-              <td class="${cls}">${fmtUsd(p.uPnl)}</td>
-              <td>${p.leverage || "—"}x</td>
-              <td>${p.liq != null ? fmtNum(p.liq) : "—"}</td>
-              <td>${sl}</td>
-              <td>${exCell(se.h1)}</td>
-              <td>${exCell(se.h4)}</td>
-              <td>${exCell(se.nbar)}</td>
-              <td>${exCell(se.mom)}</td>
-            </tr>`;
-          }).join("")
-        : `<tr><td colspan="13" style="color:var(--muted)">No open positions</td></tr>`;
-
-      el("meta").innerHTML = `view=<span class="ok">Cockpit</span> · eq=<span class="ok">${fmtUsd(eq)}</span> · uPnL=<span class="${upnl >= 0 ? "ok" : "err"}">${fmtUsd(upnl)}</span> · pos=${pos.length}`;
-    } catch (e) {
-      el("meta").innerHTML = `<span class="err">cockpit load failed: ${escapeHtml(e.message)}</span>`;
-    }
-  }
-
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  }
-
-  /* ——— Radar ——— */
-  function applyFilter(list) {
-    switch (filter) {
-      case "green": return list.filter((r) => r.trend === "Green");
-      case "red": return list.filter((r) => r.trend === "Red");
-      case "dual_cross_up": return list.filter((r) => r.dual_cross_up);
-      case "dual_cross_down_filter": return list.filter((r) => r.dual_cross_down_filter);
-      case "above_upper": return list.filter((r) => r.above_upper);
-      default: return list.slice();
-    }
-  }
-  function cmp(a, b) {
-    let va = a[sortKey], vb = b[sortKey];
-    if (typeof va === "boolean") { va = va ? 1 : 0; vb = vb ? 1 : 0; }
-    if (typeof va === "string") {
-      const c = va.localeCompare(vb || "", undefined, { sensitivity: "base" });
-      return sortAsc ? c : -c;
-    }
-    if (va == null) va = -Infinity;
-    if (vb == null) vb = -Infinity;
-    return sortAsc ? va - vb : vb - va;
-  }
-  function renderTable() {
-    const list = applyFilter(rows).sort(cmp);
-    const tb = el("tbody");
-    el("empty").hidden = list.length > 0;
-    tb.innerHTML = list.map((r) => {
-      let cls = "";
-      if (r.dual_cross_up) cls = "hl-up";
-      else if (r.dual_cross_down_filter) cls = "hl-down";
-      const trendCls = r.trend === "Green" ? "trend-g" : "trend-r";
-      const tier = (r.tier || "tiny").toLowerCase();
-      const cat = r.category || "Price";
+    el("radarEmpty").hidden = rows.length > 0;
+    el("radarTbody").innerHTML = rows.map(r => {
+      const tCls = r.trend==="Green"?"trend-g":"trend-r";
+      const tier = (r.tier||"tiny").toLowerCase();
+      const cls  = r.dual_cross_up?"hl-up":r.dual_cross_down_filter?"hl-down":"";
       return `<tr class="${cls}">
-        <td>${r.symbol}</td>
+        <td>${esc(r.symbol)}</td>
         <td class="tier-${tier}">${tier}</td>
-        <td class="cat-${cat}">${cat}</td>
-        <td class="${trendCls}">${r.trend}</td>
+        <td class="cat-${r.category||""}">${r.category||"—"}</td>
+        <td class="${tCls}">${r.trend}</td>
         <td>${fmtNum(r.close)}</td>
         <td>${fmtNum(r.filter)}</td>
         <td>${fmtNum(r.upper)}</td>
         <td>${fmtNum(r.lower)}</td>
         <td>${boolCell(r.above_upper)}</td>
         <td>${boolCell(r.dual_cross_up)}</td>
-        <td class="us-${(r.upper_status || "below")}">${r.upper_status || "—"}</td>
-        <td>${boolCell(r.dual_cross_down_filter, true)}</td>
-        <td>${r.drop_from_ath_pct != null ? r.drop_from_ath_pct.toFixed(1) + "%" : "—"}</td>
-        <td>${r.from_atl_pct != null ? r.from_atl_pct.toFixed(1) + "%" : "—"}</td>
-        <td>${r.day_ntl_vlm != null ? fmtNum(r.day_ntl_vlm) : "—"}</td>
-        <td>${r.vol_accel != null ? Number(r.vol_accel).toFixed(2) : (r.rvol != null ? Number(r.rvol).toFixed(2) : "—")}</td>
-        <td>${r.mom_score != null ? Number(r.mom_score).toFixed(3) : "—"}</td>
-        <td>${r.mom_rank != null ? r.mom_rank : "—"}</td>
+        <td class="us-${r.upper_status||"below"}">${r.upper_status||"—"}</td>
+        <td>${boolCell(r.dual_cross_down_filter,true)}</td>
+        <td>${r.rvol!=null?Number(r.rvol).toFixed(2):(r.vol_accel!=null?Number(r.vol_accel).toFixed(2):"—")}</td>
+        <td>${r.mom_score!=null?Number(r.mom_score).toFixed(3):"—"}</td>
+        <td>${r.mom_rank??"—"}</td>
       </tr>`;
     }).join("");
-    document.querySelectorAll("#radarPanel th[data-k]").forEach((th) => {
-      th.classList.toggle("sorted", th.dataset.k === sortKey);
-      const arrow = th.querySelector(".arrow");
-      if (arrow) arrow.textContent = th.dataset.k === sortKey ? (sortAsc ? "↑" : "↓") : "↕";
+    // Update sort arrows
+    document.querySelectorAll("#viewRadar th[data-k]").forEach(th => {
+      th.classList.toggle("sorted", th.dataset.k===radarSortK);
+      const a = th.querySelector(".arrow");
+      if (a) a.textContent = th.dataset.k===radarSortK ? (radarSortA?"↑":"↓") : "↕";
     });
   }
-  function renderMeta(data) {
-    const dry = data.dry_run ? "DRY_RUN" : "LIVE?";
-    const ts = data.ts || "—";
-    lastTs = ts;
-    const curTf = data.tf || tf;
-    el("tfLabel").textContent = curTf;
-    const floors = data.universe_floors || {};
-    const floorNote = floors.min_day_ntl_vlm != null ? ` · floor dayNtl≥$${Number(floors.min_day_ntl_vlm).toLocaleString()}` : "";
-    el("meta").innerHTML = `tf=<span class="ok">${curTf}</span> · scan <span class="ok">${ts}</span> · ${dry} · n=${data.n_scanned ?? "—"}${floorNote}`;
-    const b = data.breadth || {};
-    el("gCount").textContent = b.green_count ?? "—";
-    el("rCount").textContent = b.red_count ?? "—";
-    el("gPct").textContent = b.green_pct != null ? b.green_pct.toFixed(2) + "%" : "—";
-    el("nCount").textContent = b.n ?? data.n_scanned ?? "—";
-    const pct = Number(b.green_pct) || 0;
-    el("barFill").style.width = Math.max(0, Math.min(100, pct)) + "%";
-    const f = data.flags || {};
-    const up = (f.dual_cross_up || []).map((s) => `<span class="chip up">${s}</span>`).join(" ") || "<span>—</span>";
-    const dn = (f.dual_cross_down_filter || []).map((s) => `<span class="chip down">${s}</span>`).join(" ") || "<span>—</span>";
-    el("flagLine").innerHTML = `dual_cross_up: ${up} &nbsp;&nbsp; dual_cross_down_filter: ${dn}`;
-    el("footer").innerHTML = `Auto-refresh every 60s · fetch <code>${dataUrl(tf)}</code> · no trading`;
-  }
-  function applyData(data) {
-    rows = Array.isArray(data.rows) ? data.rows : [];
-    renderMeta(data);
-    renderTable();
-  }
-  async function loadRadar() {
-    showView("radar");
-    try {
-      const r = await fetch(dataUrl(tf) + "?t=" + Date.now(), { cache: "no-store" });
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      const data = await r.json();
-      applyData(data);
-      el("meta").innerHTML = `tf=<span class="ok">${data.tf || tf}</span> · scan <span class="ok">${data.ts || "—"}</span> · DRY_RUN · n=${data.n_scanned ?? "—"} · refreshed`;
-    } catch (e) {
-      el("meta").innerHTML = `<span class="err">load failed (${tf}): ${escapeHtml(e.message)}</span>` +
-        (lastTs ? ` · last ok ${lastTs}` : "");
-      rows = [];
-      renderTable();
-    }
-  }
 
-
-  function fmtExitCell(ex) {
-    if (!ex || ex.px == null) return '<span class="exit-cell">—</span>';
-    const pnl = Number(ex.pnl_usd);
-    const cls = pnl >= 0 ? "pos" : "neg";
-    const sign = pnl >= 0 ? "+" : "";
-    const fade = ex.mom_vol_fade ? '<span class="fade"> vol↓</span>' : "";
-    return `<span class="exit-cell"><span class="px">${fmtNum(ex.px)}</span><span class="pnl ${cls}">${sign}$${Math.abs(pnl).toFixed(2)}</span>${fade}</span>`;
-  }
-
-  /* ——— Desk ——— */
-  async function loadDesk() {
-    showView("desk");
-    el("footer").innerHTML = 'Desk · <code>out/desk_daily.json</code> · daily 08:40 + on demand';
-    try {
-      const r = await fetch("out/desk_daily.json?t=" + Date.now(), { cache: "no-store" });
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      const d = await r.json();
-      const a = d.account || {};
-      const pnl = a.uPnl_sum || 0;
-      el("dEq").textContent = (a.equity ?? a.total_eq ?? a.spot_usdc) != null ? "$" + Number(a.equity ?? a.total_eq ?? a.spot_usdc).toFixed(2) : "—";
-      el("dNav").textContent = a.perp_nav != null ? "$" + Number(a.perp_nav).toFixed(2) : "—";
-      el("dPnl").textContent = (pnl >= 0 ? "+" : "") + "$" + Number(pnl).toFixed(4);
-      el("dPnl").className = pnl >= 0 ? "g" : "r";
-      el("dTs").textContent = d.ts_hkt || d.ts || "—";
-      const ban = (d.suggested_exits_meta && d.suggested_exits_meta.banner) || null;
-      if (ban && el("deskExitBanner")) el("deskExitBanner").textContent = ban;
-      const sot = d.sot || {};
-      el("deskSot").innerHTML = `own=${sot.entry_own_narrative || "—"} · majors=${sot.entry_majors || "—"} · SL=${sot.sl || "—"} · TP=${sot.tp || "—"} · size=${sot.size_pct || "—"}% · lev=${sot.leverage || "—"}`;
-      const pos = d.positions || [];
-      el("deskPos").innerHTML = pos.length ? pos.map((p) => {
-        const cls = (p.uPnl || 0) >= 0 ? "trend-g" : "trend-r";
-        const se = p.suggested_exits || {};
-        return `<tr><td>${p.coin}</td><td>${p.side}</td><td>${p.size}</td><td>${fmtNum(p.entry)}</td><td>${fmtNum(p.positionValue)}</td><td class="${cls}">${p.uPnl}</td><td>${p.leverage || "—"}</td><td>${p.liq ?? "—"}</td>
-          <td>${fmtExitCell(se.h1)}</td><td>${fmtExitCell(se.h4)}</td><td>${fmtExitCell(se.nbar)}</td><td>${fmtExitCell(se.mom)}</td></tr>`;
-      }).join("") : `<tr><td colspan="12" style="color:var(--muted)">No positions</td></tr>`;
-
-      // flatten candidates dict
-      const c = d.candidates || {};
-      const flat = [];
-      (c.dual_cross_up || []).forEach((x) => flat.push({ ...x, sleeve: "dual_cross_up" }));
-      (c.own_upper_new || []).forEach((x) => flat.push({ ...x, sleeve: "own_new" }));
-      (c.own_held_dual || []).forEach((x) => flat.push({ ...x, sleeve: "own_held" }));
-      (c.majors_filter_cross_green || []).forEach((x) => flat.push({ ...x, sleeve: "majors_filter" }));
-      (c.narrative_entry || []).forEach((x) => flat.push({ ...x, sleeve: "narrative" }));
-      if (c.majors && typeof c.majors === "object" && !Array.isArray(c.majors)) {
-        Object.keys(c.majors).forEach((sym) => {
-          const m = c.majors[sym];
-          flat.push({ symbol: sym, trend: m.trend, dual_cross_up: m.dual_cross_up || m.dual_cross_filter_up, sleeve: "majors", note: m.chase_blocked ? "chase blocked" : (m.new_entry_ok ? "entry ok" : "") });
-        });
-      }
-      el("deskCand").innerHTML = flat.length ? flat.slice(0, 60).map((c0) => {
-        const tcls = c0.trend === "Green" ? "trend-g" : "trend-r";
-        return `<tr class="${c0.dual_cross_up ? "hl-up" : ""}"><td>${c0.symbol || ""}</td><td class="${tcls}">${c0.trend || "—"}</td><td>${boolCell(!!c0.dual_cross_up)}</td><td>${c0.sleeve || "—"}</td><td style="max-width:280px;white-space:normal;color:var(--muted);font-size:0.75rem">${c0.note || ""}</td></tr>`;
-      }).join("") : `<tr><td colspan="5" style="color:var(--muted)">No candidates</td></tr>`;
-
-      el("meta").innerHTML = `view=<span class="ok">Desk</span> · ${d.ts_hkt || ""} · positions=${pos.length} · uPnL=<span class="${pnl >= 0 ? "ok" : "err"}">$${Number(pnl).toFixed(4)}</span>`;
-      el("deskClock").innerHTML = "Desk <strong>" + (d.ts_hkt || "—") + "</strong>";
-    } catch (e) {
-      el("meta").innerHTML = `<span class="err">desk load failed: ${escapeHtml(e.message)}</span>`;
-    }
-  }
-
-  /* ——— Narrative ——— */
-  async function loadNarrative() {
-    showView("narrative");
-    el("footer").innerHTML = 'Narrative · fetch <code>out/narrative_watchlist.json</code> + <code>out/bitunix_gc_1d.json</code> · Bitunix GC · semi-auto';
+  // ══════════════════════════════════════════════════════════
+  // NARRATIVE
+  // ══════════════════════════════════════════════════════════
+  async function renderNarrative() {
     try {
       const [wR, gR] = await Promise.all([
-        fetch("out/narrative_watchlist.json?t=" + Date.now(), { cache: "no-store" }),
-        fetch("out/bitunix_gc_1d.json?t=" + Date.now(), { cache: "no-store" }),
+        fetch("out/narrative_watchlist.json?t="+Date.now(),{cache:"no-store"}),
+        fetch("out/bitunix_gc_1d.json?t="+Date.now(),{cache:"no-store"}).catch(()=>null),
       ]);
-      if (!wR.ok) throw new Error("watchlist HTTP " + wR.status);
+      if (!wR.ok) throw new Error("watchlist "+wR.status);
       const wl = await wR.json();
-      const gc = gR.ok ? await gR.json() : { items: [] };
-      const by = {};
-      (gc.items || []).forEach((x) => { if (x.ticker) by[String(x.ticker).toUpperCase()] = x; });
-      const items = wl.items || [];
-      let buOk = 0, cross = 0;
-      const crossNames = [];
-      const rowsHtml = items.map((it) => {
-        const t = String(it.ticker || "").toUpperCase();
-        const g = by[t] || {};
-        const trend = g.trend || (g.ok === false ? "—" : (it.gc_scan ? "…" : "n/a"));
-        const trendCls = trend === "Green" ? "trend-g" : (trend === "Red" ? "trend-r" : "");
-        if (g.ok) buOk += 1;
-        if (g.dual_cross_up) { cross += 1; crossNames.push(t); }
-        let cls = "";
-        if (g.dual_cross_up) cls = "hl-up";
-        else if (g.dual_cross_down_filter) cls = "hl-down";
-        const err = g.error ? ` <span class="err">(${escapeHtml(g.error)})</span>` : "";
+      const gc = gR && gR.ok ? await gR.json() : {items:[]};
+      const byT = {};
+      (gc.items||[]).forEach(x => { if (x.ticker) byT[String(x.ticker).toUpperCase()] = x; });
+      const items = wl.items||[];
+      let cross=0; const crossNames=[];
+      const html = items.map(it => {
+        const t = String(it.ticker||"").toUpperCase();
+        const g = byT[t]||{};
+        const trend = g.trend||(it.gc_scan?"…":"n/a");
+        const tCls = trend==="Green"?"trend-g":trend==="Red"?"trend-r":"";
+        if (g.dual_cross_up){cross++;crossNames.push(t);}
+        const cls = g.dual_cross_up?"hl-up":g.dual_cross_down_filter?"hl-down":"";
         return `<tr class="${cls}">
-          <td>${it.ticker || ""}${err}</td>
-          <td>${it.sector || ""}</td>
-          <td>${it.venue || ""}${it.bitunix_symbol ? " · " + it.bitunix_symbol : ""}</td>
-          <td class="${trendCls}">${trend}</td>
-          <td>${g.close != null ? fmtNum(g.close) : "—"}</td>
-          <td>${g.upper != null ? fmtNum(g.upper) : "—"}</td>
-          <td>${g.filter != null ? fmtNum(g.filter) : "—"}</td>
-          <td>${g.above_upper != null ? boolCell(!!g.above_upper) : "—"}</td>
-          <td>${g.dual_cross_up != null ? boolCell(!!g.dual_cross_up) : "—"}</td>
-          <td style="color:var(--muted)">${g.last_cross_up_hkt || "—"}</td>
-          <td>${g.drop_from_ath_pct != null ? Number(g.drop_from_ath_pct).toFixed(1) + "%" : "—"}</td>
-          <td>${g.from_atl_pct != null ? Number(g.from_atl_pct).toFixed(1) + "%" : "—"}</td>
-          <td style="max-width:280px;white-space:normal;color:var(--muted)">${it.narrative || ""}</td>
+          <td>${esc(it.ticker||"")}</td>
+          <td>${esc(it.sector||"")}</td>
+          <td>${esc(it.venue||"")}</td>
+          <td class="${tCls}">${esc(trend)}</td>
+          <td>${g.close!=null?fmtNum(g.close):"—"}</td>
+          <td>${g.upper!=null?fmtNum(g.upper):"—"}</td>
+          <td>${g.filter!=null?fmtNum(g.filter):"—"}</td>
+          <td>${g.above_upper!=null?boolCell(!!g.above_upper):"—"}</td>
+          <td>${g.dual_cross_up!=null?boolCell(!!g.dual_cross_up):"—"}</td>
+          <td>${g.drop_from_ath_pct!=null?Number(g.drop_from_ath_pct).toFixed(1)+"%":"—"}</td>
+          <td>${g.from_atl_pct!=null?Number(g.from_atl_pct).toFixed(1)+"%":"—"}</td>
+          <td style="max-width:260px;white-space:normal;color:var(--muted)">${esc(it.narrative||"")}</td>
         </tr>`;
       }).join("");
-      el("nWatch").textContent = String(items.length);
-      el("nBuOk").textContent = String(buOk);
-      el("nCross").textContent = String(cross);
+      el("nWatch").textContent = items.length;
+      el("nCross").textContent = cross;
       el("narrFlags").innerHTML = crossNames.length
-        ? ("dual_cross_up: " + crossNames.map((s) => `<span class="chip up">${s}</span>`).join(" "))
-        : "dual_cross_up: —";
-      el("narrBody").innerHTML = rowsHtml;
-      el("narrEmpty").hidden = items.length > 0;
-      el("meta").innerHTML = `view=<span class="ok">Narrative</span> · Bitunix GC · watch=${items.length} · updated <span class="ok">${wl.updated || "—"}</span>`;
-    } catch (e) {
-      el("meta").innerHTML = `<span class="err">narrative load failed: ${escapeHtml(e.message)}</span>`;
-      el("narrBody").innerHTML = "";
-      el("narrEmpty").hidden = false;
+        ? "cross_up: "+crossNames.map(s=>`<span class="chip up">${esc(s)}</span>`).join(" ")
+        : "cross_up: —";
+      el("narrBody").innerHTML = html;
+      el("narrEmpty").hidden = items.length>0;
+    } catch(e) {
+      el("narrBody").innerHTML="";
+      el("narrEmpty").hidden=false;
+      el("narrEmpty").textContent="narrative load failed: "+esc(e.message);
     }
   }
 
-  async function load() {
-    if (view === "cockpit") return loadCockpit();
-    if (view === "desk") return loadDesk();
-    if (view === "narrative") return loadNarrative();
-    return loadRadar();
+  // ══════════════════════════════════════════════════════════
+  // DESK (legacy)
+  // ══════════════════════════════════════════════════════════
+  function renderDesk() {
+    const d = deskData;
+    if (!d) { el("deskPosBody").innerHTML='<tr><td colspan="10" class="empty">No desk data</td></tr>'; return; }
+    const a = d.account||{};
+    const pnl = Number(a.uPnL_sum)||0;
+    el("dEq").textContent  = fmtUsd(Number(a.equity??a.total_eq??a.spot_usdc));
+    el("dPnl").textContent = (pnl>=0?"+":"")+fmtUsd(pnl,4);
+    el("dPnl").className   = pnl>=0?"g":"r";
+    el("dTs").textContent  = d.ts_hkt||d.ts||"—";
+    const sot = d.sot||{};
+    el("deskSot").innerHTML = `entry=${sot.entry_own_narrative||"—"} · SL=${sot.sl||"—"} · TP=${sot.tp||"—"} · size=${sot.size_pct||"—"}% · lev=${sot.leverage||"—"}`;
+    const pos = d.positions||[];
+    el("deskPosBody").innerHTML = pos.length
+      ? pos.map(p=>{
+          const cls=(Number(p.uPnL)||0)>=0?"trend-g":"trend-r";
+          const se=p.suggested_exits||{};
+          const exC = (ex) => ex&&ex.px!=null ? fmtNum(ex.px) : "—";
+          return `<tr><td>${esc(p.coin)}</td><td>${p.side}</td><td>${p.size}</td><td>${fmtNum(p.entry)}</td>
+            <td>${fmtNum(p.positionValue)}</td><td class="${cls}">${fmtUsd(p.uPnL)}</td>
+            <td>${p.leverage??"—"}</td><td>${p.liq??p.liquidation_px??"—"}</td>
+            <td>${exC(se.h1)}</td><td>${exC(se.h4)}</td></tr>`;
+        }).join("")
+      : '<tr><td colspan="10" class="empty">No positions in desk_daily.json</td></tr>';
+    const c=d.candidates||{};
+    const flat=[];
+    (c.dual_cross_up||[]).forEach(x=>flat.push({...x,sleeve:"cross_up"}));
+    (c.own_upper_new||[]).forEach(x=>flat.push({...x,sleeve:"own_new"}));
+    (c.narrative_entry||[]).forEach(x=>flat.push({...x,sleeve:"narrative"}));
+    if (c.majors&&typeof c.majors==="object"&&!Array.isArray(c.majors)) {
+      Object.keys(c.majors).forEach(sym=>{
+        const m=c.majors[sym];
+        flat.push({symbol:sym,trend:m.trend,dual_cross_up:m.dual_cross_up,sleeve:"majors",note:m.new_entry_ok?"entry ok":""});
+      });
+    }
+    el("deskCandBody").innerHTML = flat.length
+      ? flat.slice(0,60).map(c0=>`<tr class="${c0.dual_cross_up?"hl-up":""}">
+          <td>${esc(c0.symbol||"")}</td>
+          <td class="${c0.trend==="Green"?"trend-g":"trend-r"}">${esc(c0.trend||"—")}</td>
+          <td>${boolCell(!!c0.dual_cross_up)}</td>
+          <td>${esc(c0.sleeve||"")}</td>
+          <td style="max-width:260px;white-space:normal;color:var(--muted)">${esc(c0.note||"")}</td>
+        </tr>`).join("")
+      : '<tr><td colspan="5" class="empty">No candidates</td></tr>';
   }
 
-  el("mainTabs").addEventListener("click", (ev) => {
+  // ── Event listeners ───────────────────────────────────────────────────
+  el("mainTabs").addEventListener("click", ev => {
     const btn = ev.target.closest("button[data-view]");
     if (!btn) return;
-    const next = btn.dataset.view;
-    if (next === view) return;
-    view = next;
-    load();
+    showView(btn.dataset.view);
   });
-
-  el("tfTabs").addEventListener("click", (ev) => {
+  el("tfTabs").addEventListener("click", ev => {
     const btn = ev.target.closest("button[data-tf]");
-    if (!btn) return;
-    const next = btn.dataset.tf;
-    if (!VALID_TFS.includes(next) || next === tf) return;
-    tf = next;
-    document.querySelectorAll("#tfTabs button").forEach((b) => b.classList.toggle("active", b === btn));
-    if (view === "radar") loadRadar();
+    if (!btn||!VALID_TFS.includes(btn.dataset.tf)) return;
+    radarTf = btn.dataset.tf;
+    el("tfTabs").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b===btn));
+    renderRadar();
   });
-
-  el("filters").addEventListener("click", (ev) => {
+  el("radarFilters").addEventListener("click", ev => {
     const btn = ev.target.closest("button[data-f]");
     if (!btn) return;
-    filter = btn.dataset.f;
-    document.querySelectorAll("#filters button").forEach((b) => b.classList.toggle("active", b === btn));
-    renderTable();
+    radarFilter = btn.dataset.f;
+    el("radarFilters").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b===btn));
+    renderRadar();
   });
-
-  document.querySelectorAll("#radarPanel th[data-k]").forEach((th) => {
+  document.querySelectorAll("#viewRadar th[data-k]").forEach(th => {
     th.addEventListener("click", () => {
       const k = th.dataset.k;
-      if (sortKey === k) sortAsc = !sortAsc;
-      else { sortKey = k; sortAsc = true; }
-      renderTable();
+      if (radarSortK===k) radarSortA=!radarSortA;
+      else { radarSortK=k; radarSortA=false; }
+      renderRadar();
     });
   });
 
-  const rightTabs = document.querySelector(".right-tabs");
-  if (rightTabs) {
-    rightTabs.addEventListener("click", (ev) => {
-      const btn = ev.target.closest("button[data-rtab]");
-      if (!btn) return;
-      rightTab = btn.dataset.rtab;
-      rightTabs.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
-      const act = el("rtabActions");
-      const pos = el("rtabPositions");
-      if (act) act.classList.toggle("hidden", rightTab !== "actions");
-      if (pos) pos.classList.toggle("hidden", rightTab !== "positions");
-    });
+  // ── Boot ──────────────────────────────────────────────────────────────
+  async function boot() {
+    // Kick off all fetches in parallel
+    await Promise.all([refreshAllRadar(), refreshDeskData()]);
+    renderCurrentView();
   }
 
-  // live clock
-  function tickClock() {
-    const now = new Date();
-    // Asia/Shanghai display
-    const hkt = now.toLocaleString("en-GB", { timeZone: "Asia/Shanghai", hour12: false });
-    const node = el("deskClock");
-    if (node && view === "cockpit") {
-      // keep desk ts as primary; append local
-      const strong = node.querySelector("strong");
-      if (strong && !strong.dataset.locked) {
-        /* desk ts set by load */
-      }
-    }
-    void hkt;
-  }
-  setInterval(tickClock, 1000);
+  boot();
 
-  load();
-  setInterval(load, REFRESH_MS);
 })();
 </script>
 </body>
