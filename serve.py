@@ -16,6 +16,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request as _url_req
 from datetime import datetime, timezone
 from http.cookies import SimpleCookie
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -23,7 +24,9 @@ from urllib.parse import parse_qs, urlparse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get("PORT") or "8787")
-HOST = os.environ.get("HOST") or ("0.0.0.0" if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY") else "0.0.0.0")
+HOST = os.environ.get("HOST") or (
+    "0.0.0.0" if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY") else "0.0.0.0"
+)
 SCAN_SCRIPT = os.path.join(ROOT, "scan_gc_radar.py")
 UI_PATH = os.path.join(ROOT, "ui.html")
 OUT_DIR = os.path.join(ROOT, "out")
@@ -33,7 +36,11 @@ ON_RAILWAY = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILW
 COOKIE_NAME = "otr_session"
 SESSION_SECRET = (os.environ.get("SESSION_SECRET") or PASSWORD or "dev-local").encode()
 # Scheduler (Railway): UTC :05 after bar close. HKT = UTC+8.
-SCHEDULER_ENABLE = (os.environ.get("OTR_SCHEDULER") or ("1" if ON_RAILWAY else "0")).strip() in ("1", "true", "yes")
+SCHEDULER_ENABLE = (os.environ.get("OTR_SCHEDULER") or ("1" if ON_RAILWAY else "0")).strip() in (
+    "1",
+    "true",
+    "yes",
+)
 SCAN_MAX = int(os.environ.get("OTR_SCAN_MAX") or "280")
 SCAN_MAX_1H = int(os.environ.get("OTR_SCAN_MAX_1H") or "200")
 SCAN_CONCURRENCY = int(os.environ.get("OTR_SCAN_CONCURRENCY") or "2")
@@ -41,6 +48,10 @@ SCAN_CONCURRENCY = int(os.environ.get("OTR_SCAN_CONCURRENCY") or "2")
 SCAN_INTERVAL_MIN = max(5, int(os.environ.get("OTR_SCAN_INTERVAL_MIN") or "15"))
 _scan_lock = threading.Lock()
 _last_scan: dict[str, str] = {}  # tf -> slot key
+
+# Desk-data endpoint: HL wallet (public read-only)
+HL_WALLET = os.environ.get("HL_WALLET") or "0xcFCda0F8576a268BaA17935368081F4e687dB122"
+HL_API_URL = "https://api.hyperliquid.xyz/info"
 
 LOGIN_HTML = """<!doctype html><html><head><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\">
 <title>Own Trend Radar</title>
@@ -246,6 +257,10 @@ class Handler(SimpleHTTPRequestHandler):
                 },
             )
             return
+        # Public desk-data endpoint — no auth; used by Claude scheduled tasks
+        if path == "/api/desk-data":
+            self._desk_data()
+            return
         if self._need_auth():
             return
         if path in ("/", "/index.html"):
@@ -336,6 +351,45 @@ class Handler(SimpleHTTPRequestHandler):
             os.replace(tmp, dest)
             written.append(safe)
         self._send_json(200, {"ok": True, "written": written})
+
+    def _desk_data(self) -> None:
+        """Public endpoint — combined radar + HL data for Claude scheduled tasks.
+
+        Returns: gc_radar_1h, gc_radar_4h, gc_radar_1d (from volume),
+                 hl_perp (clearinghouseState), hl_spot (spotClearinghouseState), ts.
+        No auth required — wallet is read-only public data.
+        """
+        result: dict = {}
+
+        # 1) Radar JSONs from volume mount
+        for tf in ("1h", "4h", "1d"):
+            fp = os.path.join(OUT_DIR, f"gc_radar_{tf}.json")
+            try:
+                with open(fp) as f:
+                    result[f"gc_radar_{tf}"] = json.load(f)
+            except Exception as e:
+                result[f"gc_radar_{tf}"] = {"error": str(e)}
+
+        # 2) HL position data (Railway has unrestricted egress)
+        for req_type, key in [
+            ("clearinghouseState", "hl_perp"),
+            ("spotClearinghouseState", "hl_spot"),
+        ]:
+            try:
+                payload = json.dumps({"type": req_type, "user": HL_WALLET}).encode()
+                req = _url_req.Request(
+                    HL_API_URL,
+                    data=payload,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with _url_req.urlopen(req, timeout=15) as resp:
+                    result[key] = json.loads(resp.read())
+            except Exception as e:
+                result[key] = {"error": str(e)}
+
+        result["ts"] = datetime.now(timezone.utc).isoformat()
+        self._send_json(200, result)
 
     def _send_file(self, filepath: str, content_type: str) -> None:
         try:
