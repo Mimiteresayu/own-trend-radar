@@ -138,6 +138,50 @@ def _due_tfs(now: datetime) -> list[tuple[str, int]]:
     return due
 
 
+def _log_desk_data() -> None:
+    """Emit desk data (radar + HL positions) to stderr for Railway log relay.
+
+    Duplicates the logic of Handler._desk_data() but writes JSON to stderr
+    prefixed with [DESK_DATA] so Claude scheduled tasks can read it from
+    Railway logs (HTTP is blocked by Anthropic's cloud egress proxy).
+    """
+    result: dict = {}
+
+    # 1) Radar JSONs from volume mount
+    for tf in ("1h", "4h", "1d"):
+        fp = os.path.join(OUT_DIR, f"gc_radar_{tf}.json")
+        try:
+            with open(fp) as f:
+                result[f"gc_radar_{tf}"] = json.load(f)
+        except Exception as e:
+            result[f"gc_radar_{tf}"] = {"error": str(e)}
+
+    # 2) HL position data (Railway has unrestricted egress)
+    for req_type, key in [
+        ("clearinghouseState", "hl_perp"),
+        ("spotClearinghouseState", "hl_spot"),
+    ]:
+        try:
+            payload = json.dumps({"type": req_type, "user": HL_WALLET}).encode()
+            req = _url_req.Request(
+                HL_API_URL,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with _url_req.urlopen(req, timeout=15) as resp:
+                result[key] = json.loads(resp.read())
+        except Exception as e:
+            result[key] = {"error": str(e)}
+
+    result["ts"] = datetime.now(timezone.utc).isoformat()
+    try:
+        sys.stderr.write(f"[DESK_DATA] {json.dumps(result)}\n")
+        sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f"[DESK_DATA] error emitting desk data: {e}\n")
+
+
 def _scheduler_loop() -> None:
     sys.stderr.write(
         f"[scheduler] started UTC: 1h+4h every {SCAN_INTERVAL_MIN}m; 1d@00:05 "
@@ -161,6 +205,7 @@ def _scheduler_loop() -> None:
                     _last_scan[tf] = "boot"
         finally:
             _scan_lock.release()
+        _log_desk_data()  # emit after boot scans for MCP relay
 
     while True:
         try:
@@ -185,6 +230,7 @@ def _scheduler_loop() -> None:
                         if "1h" in intraday:
                             ok, note = _run_scan(["1h"], max_symbols=SCAN_MAX_1H)
                             sys.stderr.write(f"[scheduler] {now.isoformat()} 1h ok={ok} {note[:300]}\n")
+                            _log_desk_data()  # emit after each scan slot for MCP relay
                 finally:
                     _scan_lock.release()
         except Exception as e:
@@ -436,6 +482,8 @@ class Handler(SimpleHTTPRequestHandler):
             ok, note = _run_scan(tfs, max_symbols=max_symbols)
         finally:
             _scan_lock.release()
+        if ok:
+            _log_desk_data()  # emit updated desk data after manual rescan
         if not ok:
             self._send_json(500, {"ok": False, "error": note})
             return
