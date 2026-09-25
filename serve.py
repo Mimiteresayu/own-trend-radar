@@ -113,6 +113,9 @@ def _run_failsafe() -> tuple[bool, str]:
         return True, f"failsafe {mode} status={status} pos={pos_count} actions={action_count}"
     except Exception:
         return True, "failsafe ran (status unknown)"
+
+
+def _run_scan(tfs: list[str], max_symbols: int | None = None) -> tuple[bool, str]:
     """Run scan_gc_radar.py for given TFs. Returns (ok, note/error)."""
     if not os.path.isfile(SCAN_SCRIPT):
         return False, "scan_gc_radar.py missing"
@@ -147,7 +150,7 @@ def _run_failsafe() -> tuple[bool, str]:
     return True, f"scanned {','.join(tfs)}"
 
 
-def _run_scan(tfs: list[str], max_symbols: int | None = None) -> tuple[bool, str]:
+def _slot_key(now: datetime, kind: str) -> str:
     """Dedup key so each schedule window runs once."""
     if kind == "1d":
         return now.strftime("%Y-%m-%d") + ":1d"
