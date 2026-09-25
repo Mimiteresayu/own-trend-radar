@@ -1,0 +1,2 @@
+# Own Trend Radar dependencies
+hyperliquid-python-sdk==0.24.0

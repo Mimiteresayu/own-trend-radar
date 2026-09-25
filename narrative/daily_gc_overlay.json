@@ -1,0 +1,79 @@
+{
+  "ts": "2026-09-21T00:55:30.141315+00:00",
+  "watch_gc_count": 8,
+  "entry_candidates": [],
+  "overlay": [
+    {
+      "ticker": "DKNG",
+      "sector": "tokenized-equity",
+      "narrative": "Sports-betting equity quote paired with ALLINU",
+      "in_radar": false,
+      "trend": null,
+      "signal": null,
+      "close": null
+    },
+    {
+      "ticker": "PLTR",
+      "sector": "tokenized-equity",
+      "narrative": "Palantir-linked pair / Robinhood Chain backdrop for WORM",
+      "in_radar": false,
+      "trend": null,
+      "signal": null,
+      "close": null
+    },
+    {
+      "ticker": "BONK",
+      "sector": "meme",
+      "narrative": "Mature SOL meme beta if SOL breaks highs",
+      "in_radar": false,
+      "trend": null,
+      "signal": null,
+      "close": null
+    },
+    {
+      "ticker": "PEPE",
+      "sector": "meme",
+      "narrative": "Mentioned as rotation-out vs LAMBO; mature meme beta",
+      "in_radar": false,
+      "trend": null,
+      "signal": null,
+      "close": null
+    },
+    {
+      "ticker": "BTC",
+      "sector": "major",
+      "narrative": "Macro + Renzo Basis spot leg",
+      "in_radar": true,
+      "trend": "Green",
+      "signal": null,
+      "close": 81221.0
+    },
+    {
+      "ticker": "ETH",
+      "sector": "major",
+      "narrative": "Meme supercycle trigger (break prior highs)",
+      "in_radar": true,
+      "trend": "Green",
+      "signal": null,
+      "close": 2646.2
+    },
+    {
+      "ticker": "SOL",
+      "sector": "major",
+      "narrative": "SOL meme / BONK trigger",
+      "in_radar": true,
+      "trend": "Green",
+      "signal": null,
+      "close": 111.19
+    },
+    {
+      "ticker": "HYPE",
+      "sector": "major",
+      "narrative": "HL ecosystem + Renzo Basis",
+      "in_radar": true,
+      "trend": "Green",
+      "signal": null,
+      "close": 93.749
+    }
+  ]
+}

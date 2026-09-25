@@ -67,6 +67,60 @@ Still supported for desk_daily / narrative / optional radar override.
 
 Returns 409 if a scan is already running.
 
+## Fail-safe exit worker (DORMANT build; not enabled)
+
+`failsafe_exit_worker.py` — deterministic, no-LLM exit worker that can run on Railway
+inside the existing scheduler, so open positions stay managed when the LLM operator is offline.
+
+**LOCKED rules** (from SIZE_TIER_EXIT_LOCKED.md / HARBOR_AUTOTRADE_PROMPT_v1.md):
+- GC periods: 1D=144, 4H=72, 1H=48, Lag/Fast off, closed bars only
+- Tiers by mcap: Mega/Large → 4H Filter cross-down; Small/Tiny → 1H Lower cross-down
+- Hard SL: Mega/Large → 4H Lower; Small/Tiny → 4H Filter (mid); re-aligned each run
+- Shorts: report-only (no exit logic locked yet)
+- **Never opens positions** (reduce-only exits + SL orders only)
+
+**Mode:**
+- `FAILSAFE_ENABLE=1` + `HL_API_WALLET_KEY` present → **LIVE** (places orders via hyperliquid-python-sdk)
+- Otherwise → **DRY_RUN** (writes `out/failsafe_last.json` only, no orders)
+
+**Staleness guard:** If 1h/4h radar or candles can't be fetched or are >2h old, worker
+does nothing destructive and logs error.
+
+**Retry/backoff:** Retries HL API calls on 429 with exponential backoff (2s/4s/8s).
+
+**Alert webhook:** If `ALERT_WEBHOOK_URL` is set, POSTs short text on any live action or error:
+```json
+{"text": "[failsafe] EXIT BTC EXIT_LONG_4H_FILTER_CROSS size=0.05"}
+```
+
+**Output:** Every run writes `out/failsafe_last.json` with:
+```json
+{
+  "ts": "2026-09-25T14:52:00+00:00",
+  "mode": "DRY_RUN",
+  "errors": [],
+  "actions": [{"action": "market_close", "coin": "BTC", "size": 0.05, "signal": "EXIT_LONG_4H_FILTER_CROSS"}],
+  "positions": [...],
+  "status": "ok"
+}
+```
+
+**Schedule:** Intended to run hourly a few minutes after the hour close (e.g. `:05` UTC).
+Not auto-enabled — integration into `serve.py` scheduler is a manual step if needed.
+
+**Env vars to go live:**
+- `FAILSAFE_ENABLE=1` — master enable switch
+- `HL_ADDRESS` — wallet address (read positions)
+- `HL_API_WALLET_KEY` — API wallet key (agent wallet, **not** the master key; place orders)
+- `ALERT_WEBHOOK_URL` (optional) — webhook for live action/error alerts
+
+**Tests:** Run `python test_failsafe_exit_worker.py` for unit tests of signal functions.
+Dry-run smoke test (no keys) should not crash.
+
+**IMPORTANT:** This worker is built but **DORMANT** (not enabled). Do not set `FAILSAFE_ENABLE=1`
+or add `HL_API_WALLET_KEY` without explicit operator approval. Strategy parameters are locked
+and must not be changed. Never add entry logic to this worker.
+
 ## Narrative
 
 **Narrative stays on Grok.ai / Harbor** — this cron does **not** refresh narrative

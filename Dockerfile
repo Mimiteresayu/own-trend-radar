@@ -1,7 +1,10 @@
 FROM python:3.12-slim
 WORKDIR /app
+# Install dependencies (hyperliquid-python-sdk for fail-safe worker)
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 # Scanner is stdlib-only (urllib fallback); bake it so Railway self-refreshes without Harbor.
-COPY serve.py ui.html scan_gc_radar.py mcap_tiers.py ./
+COPY serve.py ui.html scan_gc_radar.py mcap_tiers.py failsafe_exit_worker.py ./
 COPY data/ ./data/
 # Bake narrative watchlist fallback (Harbor may overwrite via /api/sync)
 RUN mkdir -p out narrative

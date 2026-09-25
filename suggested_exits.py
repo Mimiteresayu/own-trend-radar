@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Observe-only suggested exits for open HL positions. NEVER places/cancels/modifies orders.
 
+LOCKED 2026-09-21 Hard SL = 4H Lower (period 72) for all mcap tiers.
+Primary exits are tier-aware in monitor_hl_exit.py (not this file).
+
 For each open position computes four exit levels:
-  h1   — 1H GC Lower (period 48)  — observe: cross below lower channel
-  h4   — 4H GC Filter (period 72) — observe: cross below mid/filter
+  h1   — 1H GC Lower (period 48)  — observe
+  h4   — 4H GC Lower (period 72)  — Hard SL / catastrophe floor (was Filter pre-lock)
   nbar — min(low of last N fully closed 4H bars)  [SHORT: max high]
   mom  — 4H Upper (structure / 止贏); label mom_4h_upper
 
+Also attaches tier + primary_rule + filter_4h (Mega primary observe) when available.
 Optional: mom_fail_1h_filter (1H Filter) when mid > entry (long hint).
-Chart note 2026-09-21 TRX n=1: 4H=Filter mid; 1H=Lower (not mid).
 """
 from __future__ import annotations
 
@@ -23,6 +26,7 @@ from typing import Any, Dict, List, Optional, Tuple
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
+from mcap_tiers import tier_for, PRIMARY_RULE, HARD_SL_RULE  # noqa: E402
 from scan_gc_radar import (  # noqa: E402
     GC_PERIOD,
     TF_CONFIG,
@@ -251,13 +255,20 @@ def compute_for_position(p: dict) -> dict:
         exits["h1"] = None
 
     if gc4:
-        m = exit_metrics(gc4["filter"], entry, sz, side)
-        m["label"] = "4h_filter"
+        m = exit_metrics(gc4["lower"], entry, sz, side)
+        m["label"] = "4h_lower"  # Hard SL LOCKED 2026-09-21
         m["bar_utc"] = datetime.fromtimestamp(gc4["bar_t"] / 1000, tz=timezone.utc).isoformat()
+        m["hard_sl"] = True
         exits["h4"] = m
+        # observe: 4H Filter (Mega primary) — not hard SL
+        mf = exit_metrics(gc4["filter"], entry, sz, side)
+        mf["label"] = "4h_filter"
+        mf["bar_utc"] = m["bar_utc"]
+        exits["filter_4h"] = mf
     else:
         err["h4"] = "no_4h_gc"
         exits["h4"] = None
+        exits["filter_4h"] = None
 
     if nb:
         px, lows = nb
@@ -289,6 +300,7 @@ def compute_for_position(p: dict) -> dict:
         m["label"] = "mom_fail_1h_filter"
         exits["mom_fail_1h_filter"] = m
 
+    tier = tier_for(coin) if str(side).upper() == "LONG" else None
     row = {
         "coin": coin,
         "side": side,
@@ -296,6 +308,10 @@ def compute_for_position(p: dict) -> dict:
         "sz": sz,
         "mid": mid_f,
         "uPnl": p.get("uPnl"),
+        "tier": tier,
+        "primary_rule": PRIMARY_RULE.get(tier) if tier else None,
+        "hard_sl_rule": HARD_SL_RULE if tier else None,
+        "hard_sl_px": (exits.get("h4") or {}).get("px") if exits.get("h4") else None,
         "exits": exits,
     }
     if err:
@@ -317,13 +333,20 @@ def patch_desk(suggested: dict) -> None:
         # nest suggested_exits on each position
         se = {
             "h1": r["exits"].get("h1"),
-            "h4": r["exits"].get("h4"),
+            "h4": r["exits"].get("h4"),  # 4h_lower = Hard SL
             "nbar": r["exits"].get("nbar"),
             "mom": r["exits"].get("mom"),
         }
+        if r["exits"].get("filter_4h"):
+            se["filter_4h"] = r["exits"]["filter_4h"]
         if r["exits"].get("mom_fail_1h_filter"):
             se["mom_fail_1h_filter"] = r["exits"]["mom_fail_1h_filter"]
         p["suggested_exits"] = se
+        if r.get("tier"):
+            p["tier"] = r["tier"]
+            p["primary_rule"] = r.get("primary_rule")
+            p["hard_sl_rule"] = r.get("hard_sl_rule")
+            p["hard_sl_px"] = r.get("hard_sl_px")
         # refresh mid/uPnl from live if present
         if r.get("mid") is not None:
             p["mid"] = r["mid"]
@@ -333,7 +356,7 @@ def patch_desk(suggested: dict) -> None:
         "ts_hkt": suggested.get("ts_hkt"),
         "params": suggested.get("params"),
         "observe_only": True,
-        "banner": "suggested only — 1H=Lower(48) · 4H=Filter(72) — no orders",
+        "banner": "suggested only — Hard SL=4H Lower(72) · 1H=Lower(48) — no orders",
     }
     DESK.write_text(json.dumps(d, indent=2), encoding="utf-8")
     print(f"patched {DESK}")
@@ -379,7 +402,7 @@ def main() -> int:
         "ts": datetime.now(timezone.utc).isoformat(),
         "ts_hkt": _ts_hkt(),
         "observe_only": True,
-        "banner": "suggested only — 1H=Lower(48) · 4H=Filter(72) — no orders",
+        "banner": "suggested only — Hard SL=4H Lower(72) · 1H=Lower(48) — no orders",
         "wallet": addr[:6] + "…" + addr[-4:],
         "params": {
             "n": NBAR_N,
@@ -387,8 +410,9 @@ def main() -> int:
             "mom": "4h_upper",
             "gc_1d_entry": f"hlc3/4/{GC_PERIOD}/1.414 lag=0 fast=0",
             "h1": f"1h_lower period={PERIOD_H1}",
-            "h4": f"4h_filter period={PERIOD_H4}",
-            "note": "observe TRX n=1: 4H=Filter mid; 1H=Lower",
+            "h4": f"4h_lower period={PERIOD_H4} (Hard SL)",
+            "hard_sl": HARD_SL_RULE,
+            "note": "LOCKED 2026-09-21 Hard SL=4H Lower; primary exits in monitor_hl_exit",
         },
         "positions": rows,
     }
