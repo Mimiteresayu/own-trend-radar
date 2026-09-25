@@ -36,11 +36,15 @@ from mcap_tiers import tier_for, PRIMARY_RULE, HARD_SL_BY_TIER  # noqa: E402
 # Hyperliquid SDK imports (only when LIVE_MODE)
 try:
     from hyperliquid.exchange import Exchange
+    from hyperliquid.info import Info
     from hyperliquid.utils import constants
+    from eth_account import Account
     SDK_AVAILABLE = True
 except ImportError:
     SDK_AVAILABLE = False
     Exchange = None
+    Info = None
+    Account = None
 
 OUT = ROOT / "out" / "failsafe_last.json"
 RADAR_DIR = ROOT / "out"
@@ -68,11 +72,13 @@ def _get_exchange() -> Optional[Any]:
             sys.stderr.write("[failsafe] ERROR: LIVE_MODE but missing HL_API_WALLET_KEY or HL_ADDRESS\n")
             return None
         try:
-            # Exchange client with API wallet key and account_address
+            # Create wallet from private key (API/agent wallet key)
+            wallet = Account.from_key(HL_API_WALLET_KEY)
+            # Exchange client with wallet and account_address
             _exchange_client = Exchange(
-                account_address=HL_ADDRESS,
-                api_wallet_key=HL_API_WALLET_KEY,
+                wallet=wallet,
                 base_url=constants.MAINNET_API_URL,
+                account_address=HL_ADDRESS,  # trade on behalf of this address
             )
             sys.stderr.write(f"[failsafe] SDK exchange client initialized for {HL_ADDRESS[:8]}...\n")
         except Exception as e:
@@ -345,41 +351,16 @@ def _place_market_close(coin: str, size: float, is_long: bool, slippage_pct: flo
     sz_decimals = asset_info.get("szDecimals", 0)
     rounded_size = _round_size(size, sz_decimals)
 
-    # Get mid price for slippage calculation
-    mid = _get_mid_price(coin)
-    if not mid:
-        return {
-            "action": "market_close",
-            "coin": coin,
-            "size": rounded_size,
-            "error": "mid_price_unavailable",
-            "status": "error",
-        }
-
     try:
-        # Market order: is_buy opposite of position side (close long = sell, close short = buy)
-        is_buy = not is_long
-        # Compute slippage price (HL rejects limit_px=0 or prices far from mid)
-        limit_px = _slippage_price(mid, is_buy, slippage_pct, sz_decimals)
-
-        # Reduce-only IOC market order with slippage limit
-        order = {
-            "coin": coin,
-            "is_buy": is_buy,
-            "sz": rounded_size,
-            "limit_px": limit_px,
-            "order_type": {"limit": {"tif": "Ioc"}},  # IOC for market execution
-            "reduce_only": True,
-        }
-        result = exchange.order(order)
-        sys.stderr.write(f"[failsafe] LIVE: market close {coin} size={rounded_size} is_buy={is_buy} limit_px={limit_px} result={result}\n")
+        # Use Exchange.market_close convenience method (handles slippage internally)
+        result = exchange.market_close(coin, sz=rounded_size, slippage=slippage_pct / 100.0)
+        sys.stderr.write(f"[failsafe] LIVE: market_close {coin} sz={rounded_size} slippage={slippage_pct}% result={result}\n")
         return {
             "action": "market_close",
             "coin": coin,
             "size": rounded_size,
             "is_long": is_long,
-            "limit_px": limit_px,
-            "order": order,
+            "slippage_pct": slippage_pct,
             "result": result,
             "status": "placed",
         }
@@ -412,20 +393,26 @@ def _place_stop_trigger(coin: str, trigger_px: float, size: float, slippage_pct:
     rounded_trigger = _round_price(trigger_px, sz_decimals)
     
     # Compute limit_px with slippage below trigger (longs sell on stop)
-    # Trigger fires when price drops to rounded_trigger; limit allows selling down to limit_px
     limit_px = _round_price(rounded_trigger * (1.0 - slippage_pct / 100.0), sz_decimals)
 
     try:
         # Stop-market: trigger below for longs (sell when price drops)
-        order = {
-            "coin": coin,
-            "is_buy": False,  # longs: sell on stop
-            "sz": rounded_size,
-            "limit_px": limit_px,  # allow fill down to this price
-            "order_type": {"trigger": {"trigger_px": rounded_trigger, "is_market": True, "tpsl": "sl"}},
-            "reduce_only": True,
+        # OrderType: {"trigger": {"triggerPx": float, "isMarket": bool, "tpsl": "sl"}}
+        order_type: Dict[str, Any] = {
+            "trigger": {
+                "triggerPx": rounded_trigger,
+                "isMarket": True,
+                "tpsl": "sl",
+            }
         }
-        result = exchange.order(order)
+        result = exchange.order(
+            name=coin,
+            is_buy=False,  # longs: sell on stop
+            sz=rounded_size,
+            limit_px=limit_px,
+            order_type=order_type,
+            reduce_only=True,
+        )
         sys.stderr.write(f"[failsafe] LIVE: place SL trigger {coin} @ {rounded_trigger} limit_px={limit_px} size={rounded_size} result={result}\n")
         return {
             "action": "place_sl",
@@ -433,7 +420,6 @@ def _place_stop_trigger(coin: str, trigger_px: float, size: float, slippage_pct:
             "trigger": rounded_trigger,
             "limit_px": limit_px,
             "size": rounded_size,
-            "order": order,
             "result": result,
             "status": "placed",
         }
@@ -458,7 +444,7 @@ def _cancel_stop_triggers(coin: str, orders: list) -> List[Dict[str, Any]]:
         if not oid:
             continue
         try:
-            result = exchange.cancel(coin, oid)
+            result = exchange.cancel(name=coin, oid=int(oid))
             sys.stderr.write(f"[failsafe] LIVE: cancel SL {coin} oid={oid} result={result}\n")
             cancels.append({"coin": coin, "oid": oid, "result": result, "status": "cancelled"})
         except Exception as e:
