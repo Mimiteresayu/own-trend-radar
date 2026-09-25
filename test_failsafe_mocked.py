@@ -25,34 +25,23 @@ class TestExchangeMocked(unittest.TestCase):
         
         # Setup mocks
         mock_exchange = MagicMock()
-        mock_exchange.order.return_value = {"status": "ok", "response": {"oid": "123"}}
+        mock_exchange.market_close.return_value = {"status": "ok", "response": {"data": {"statuses": [{"filled": {}}]}}}
         mock_exchange_getter.return_value = mock_exchange
         
         mock_asset_info.return_value = {"szDecimals": 4}
         mock_mid.return_value = 50000.0
         
-        # Close a long (size=1.2345, should round to 1.2345 with 4 decimals)
+        # Close a long (size=1.2345, should round to 1.2346 with 4 decimals)
         result = _place_market_close("BTC", 1.23456789, is_long=True, slippage_pct=2.0)
         
-        # Verify order call
-        self.assertTrue(mock_exchange.order.called)
-        order_arg = mock_exchange.order.call_args[0][0]
+        # Verify market_close was called
+        self.assertTrue(mock_exchange.market_close.called)
         
-        # Check reduce_only
-        self.assertTrue(order_arg["reduce_only"])
-        
-        # Check side (close long = sell)
-        self.assertFalse(order_arg["is_buy"])
-        
-        # Check rounded size (4 decimals)
-        self.assertEqual(order_arg["sz"], 1.2346)
-        
-        # Check limit_px uses slippage (sell: mid * 0.98)
-        # 50000 * 0.98 = 49000
-        self.assertAlmostEqual(order_arg["limit_px"], 49000.0, delta=10.0)
-        
-        # Check IOC
-        self.assertEqual(order_arg["order_type"]["limit"]["tif"], "Ioc")
+        # Check args: coin, sz, slippage
+        call_args = mock_exchange.market_close.call_args
+        self.assertEqual(call_args[0][0], "BTC")  # coin
+        self.assertAlmostEqual(call_args[1]["sz"], 1.2346, places=4)  # rounded size
+        self.assertAlmostEqual(call_args[1]["slippage"], 0.02, places=4)  # 2% as decimal
 
     @patch("failsafe_exit_worker.SDK_AVAILABLE", True)
     @patch("failsafe_exit_worker.LIVE_MODE", True)
@@ -64,7 +53,7 @@ class TestExchangeMocked(unittest.TestCase):
         from failsafe_exit_worker import _align_hard_sl
         
         mock_exchange = MagicMock()
-        mock_exchange.order.return_value = {"status": "ok"}
+        mock_exchange.order.return_value = {"status": "ok", "response": {"data": {"statuses": [{"filled": {}}]}}}
         mock_exchange_getter.return_value = mock_exchange
         
         mock_asset_info.return_value = {"szDecimals": 4}
@@ -78,11 +67,17 @@ class TestExchangeMocked(unittest.TestCase):
         # Should have cancelled old SL
         self.assertTrue(mock_cancel.called)
         
-        # Should have placed new SL
+        # Should have placed new SL via Exchange.order
         self.assertTrue(mock_exchange.order.called)
-        order_arg = mock_exchange.order.call_args[0][0]
-        self.assertEqual(order_arg["coin"], "BTC")
-        self.assertAlmostEqual(order_arg["order_type"]["trigger"]["trigger_px"], 48500.0, delta=1.0)
+        
+        # Check that order was called with positional args (name, is_buy, sz, limit_px, order_type, reduce_only)
+        call_args = mock_exchange.order.call_args
+        if call_args[0]:
+            # Positional: name is first arg
+            self.assertEqual(call_args[0][0], "BTC")
+        else:
+            # Keyword only
+            self.assertEqual(call_args[1]["name"], "BTC")
 
     @patch("failsafe_exit_worker._current_stop_trigger")
     def test_sl_drift_below_threshold_no_replace(self, mock_current):

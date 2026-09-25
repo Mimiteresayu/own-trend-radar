@@ -36,6 +36,7 @@ PASSWORD = (os.environ.get("COCKPIT_PASSWORD") or "").strip()
 ON_RAILWAY = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY"))
 COOKIE_NAME = "otr_session"
 SESSION_SECRET = (os.environ.get("SESSION_SECRET") or PASSWORD or "dev-local").encode()
+ENTRY_READ_KEY = (os.environ.get("ENTRY_READ_KEY") or "").strip()
 # Scheduler (Railway): UTC :05 after bar close. HKT = UTC+8.
 SCHEDULER_ENABLE = (os.environ.get("OTR_SCHEDULER") or ("1" if ON_RAILWAY else "0")).strip() in (
     "1",
@@ -50,6 +51,11 @@ SCAN_INTERVAL_MIN = max(5, int(os.environ.get("OTR_SCAN_INTERVAL_MIN") or "15"))
 _scan_lock = threading.Lock()
 _last_scan: dict[str, str] = {}  # tf -> slot key
 _last_failsafe: str = ""  # last failsafe run slot key (hour)
+
+try:
+    from entry_candidates import build_candidates
+except ImportError:
+    build_candidates = None  # type: ignore
 
 # Desk-data endpoint: HL wallet (public read-only)
 HL_WALLET = os.environ.get("HL_WALLET") or "0xcFCda0F8576a268BaA17935368081F4e687dB122"
@@ -169,6 +175,35 @@ def _due_tfs(now: datetime) -> list[tuple[str, int]]:
     return due
 
 
+def _generate_entry_candidates() -> None:
+    """Generate entry_candidates_latest.json and dated snapshot (non-fatal)."""
+    if not build_candidates:
+        return
+    try:
+        radar_1d_path = os.path.join(OUT_DIR, "gc_radar_1d.json")
+        radar_4h_path = os.path.join(OUT_DIR, "gc_radar_4h.json")
+        with open(radar_1d_path) as f:
+            radar_1d = json.load(f)
+        with open(radar_4h_path) as f:
+            radar_4h = json.load(f)
+        result = build_candidates(radar_1d, radar_4h)
+        # Write latest
+        latest_path = os.path.join(OUT_DIR, "entry_candidates_latest.json")
+        with open(latest_path, "w") as f:
+            json.dump(result, f, indent=2)
+        # Write dated (HKT = UTC+8)
+        now = datetime.now(timezone.utc)
+        from datetime import timedelta
+        hkt = now + timedelta(hours=8)
+        dated_name = f"entry_candidates_{hkt.strftime('%Y%m%d')}.json"
+        dated_path = os.path.join(OUT_DIR, dated_name)
+        with open(dated_path, "w") as f:
+            json.dump(result, f, indent=2)
+        sys.stderr.write(f"[entry_candidates] generated count={result['count']} → {dated_name}\n")
+    except Exception as e:
+        sys.stderr.write(f"[entry_candidates] error (non-fatal): {e}\n")
+
+
 def _log_desk_data() -> None:
     """One-line summary of scan completion (reduced from full JSON dump)."""
     try:
@@ -235,6 +270,8 @@ def _scheduler_loop() -> None:
                     if daily:
                         ok, note = _run_scan(daily, max_symbols=SCAN_MAX)
                         sys.stderr.write(f"[scheduler] {now.isoformat()} 1d ok={ok} {note[:300]}\n")
+                        if ok:
+                            _generate_entry_candidates()
                     if intraday:
                         # Prefer scanning 4h then 1h sequentially via one or two calls
                         if "4h" in intraday:
@@ -317,7 +354,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
         if path in ("/health", "/healthz"):
             self._send_json(
                 200,
@@ -328,6 +366,9 @@ class Handler(SimpleHTTPRequestHandler):
                     "scanner": os.path.isfile(SCAN_SCRIPT),
                 },
             )
+            return
+        if path == "/api/entry-candidates":
+            self._entry_candidates(parsed.query)
             return
         if self._need_auth():
             return
@@ -445,6 +486,11 @@ class Handler(SimpleHTTPRequestHandler):
         result = {"ok": True, "written": written}
         if skipped_stale:
             result["skipped_stale"] = skipped_stale
+        
+        # Generate entry candidates if 1D/4H radars were synced
+        if any("out/gc_radar_1d.json" in w for w in written):
+            _generate_entry_candidates()
+        
         self._send_json(200, result)
 
     def _desk_data(self) -> None:
@@ -507,6 +553,36 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    def _entry_candidates(self, query_str: str) -> None:
+        """Read-only endpoint for entry_candidates_latest.json (bypasses password gate).
+        
+        Auth: query param key compared with ENTRY_READ_KEY (constant-time).
+        Returns 404 if ENTRY_READ_KEY unset (disabled).
+        Returns 403 if key missing or invalid.
+        Returns 200 with JSON if key matches.
+        """
+        if not ENTRY_READ_KEY:
+            self._send_json(404, {"ok": False, "error": "entry candidates endpoint disabled"})
+            return
+        
+        qs = parse_qs(query_str)
+        provided_key = (qs.get("key") or [""])[0]
+        
+        if not provided_key or not hmac.compare_digest(provided_key, ENTRY_READ_KEY):
+            self._send_json(403, {"ok": False, "error": "forbidden"})
+            return
+        
+        # Read entry_candidates_latest.json
+        latest_path = os.path.join(OUT_DIR, "entry_candidates_latest.json")
+        try:
+            with open(latest_path) as f:
+                data = json.load(f)
+            self._send_json(200, data)
+        except FileNotFoundError:
+            self._send_json(404, {"ok": False, "error": "entry candidates not yet generated"})
+        except Exception as e:
+            self._send_json(500, {"ok": False, "error": str(e)})
 
     def _rescan(self) -> None:
         length = int(self.headers.get("Content-Length") or 0)
