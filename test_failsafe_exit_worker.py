@@ -182,31 +182,40 @@ class TestDryRunSmoke(unittest.TestCase):
 
     @patch.dict("os.environ", {
         "FAILSAFE_ENABLE": "0",
-        "HL_ADDRESS": "0x1234567890abcdef1234567890abcdef12345678",
     }, clear=False)
+    @patch("failsafe_exit_worker.HL_ADDRESS", "0x1234567890abcdef1234567890abcdef12345678")
     @patch("failsafe_exit_worker._check_radar_freshness")
     @patch("failsafe_exit_worker._hl_post_retry")
     @patch("failsafe_exit_worker.fetch_candles")
-    def test_dry_run_with_position(self, mock_fetch, mock_hl_post, mock_radar_check):
+    @patch("failsafe_exit_worker.OUT")
+    def test_dry_run_with_position(self, mock_out, mock_fetch, mock_hl_post, mock_radar_check):
         """Test dry-run with a mock position computes signal without placing orders."""
         mock_radar_check.return_value = (True, None)
         
-        # Mock position data
-        mock_hl_post.side_effect = [
-            {
-                "assetPositions": [
-                    {
-                        "position": {
-                            "coin": "BTC",
-                            "szi": "1.0",
-                            "entryPx": "50000",
-                            "unrealizedPnl": "1000",
+        # Mock OUT path to avoid file writes
+        mock_out.parent.mkdir = MagicMock()
+        mock_out.write_text = MagicMock()
+        
+        # Mock position data and openOrders
+        def hl_post_side_effect(payload):
+            if payload.get("type") == "clearinghouseState":
+                return {
+                    "assetPositions": [
+                        {
+                            "position": {
+                                "coin": "BTC",
+                                "szi": "1.0",
+                                "entryPx": "50000",
+                                "unrealizedPnl": "1000",
+                            }
                         }
-                    }
-                ]
-            },
-            [],  # openOrders
-        ]
+                    ]
+                }
+            elif payload.get("type") == "openOrders":
+                return []
+            return {}
+        
+        mock_hl_post.side_effect = hl_post_side_effect
         
         # Mock candles
         bars_4h = self._make_synthetic_bars(72 + 30, trend="up")
