@@ -36,7 +36,7 @@ class TestEntryCandidatesLogic(unittest.TestCase):
                     "upper": 10.0,
                     "filter": 9.5,
                     "dual_cross_up": True,
-                    "dayNtlVlm": 100000,
+                    "day_ntl_vlm": 100000,
                 },
                 {
                     "symbol": "BTC",
@@ -44,7 +44,7 @@ class TestEntryCandidatesLogic(unittest.TestCase):
                     "close": 60000,
                     "filter": 59000,
                     "dual_cross_up": False,
-                    "dayNtlVlm": 5000000,
+                    "day_ntl_vlm": 5000000,
                 },
             ],
         }

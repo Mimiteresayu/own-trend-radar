@@ -145,7 +145,7 @@ def build_candidates(
         upper_1d = r1d.get("upper")
         filter_1d = r1d.get("filter")
         filter_4h = r4h.get("filter") if r4h else None
-        day_ntl_vlm = r1d.get("dayNtlVlm")
+        day_ntl_vlm = r1d.get("day_ntl_vlm") or r1d.get("dayNtlVlm")
         
         # Hard SL distance (4H Filter is the Hard SL level)
         hard_sl_dist_pct = None
