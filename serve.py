@@ -139,47 +139,29 @@ def _due_tfs(now: datetime) -> list[tuple[str, int]]:
 
 
 def _log_desk_data() -> None:
-    """Emit desk data (radar + HL positions) to stderr for Railway log relay.
-
-    Duplicates the logic of Handler._desk_data() but writes JSON to stderr
-    prefixed with [DESK_DATA] so Claude scheduled tasks can read it from
-    Railway logs (HTTP is blocked by Anthropic's cloud egress proxy).
-    """
-    result: dict = {}
-
-    # 1) Radar JSONs from volume mount
-    for tf in ("1h", "4h", "1d"):
-        fp = os.path.join(OUT_DIR, f"gc_radar_{tf}.json")
-        try:
-            with open(fp) as f:
-                result[f"gc_radar_{tf}"] = json.load(f)
-        except Exception as e:
-            result[f"gc_radar_{tf}"] = {"error": str(e)}
-
-    # 2) HL position data (Railway has unrestricted egress)
-    for req_type, key in [
-        ("clearinghouseState", "hl_perp"),
-        ("spotClearinghouseState", "hl_spot"),
-    ]:
-        try:
-            payload = json.dumps({"type": req_type, "user": HL_WALLET}).encode()
-            req = _url_req.Request(
-                HL_API_URL,
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with _url_req.urlopen(req, timeout=15) as resp:
-                result[key] = json.loads(resp.read())
-        except Exception as e:
-            result[key] = {"error": str(e)}
-
-    result["ts"] = datetime.now(timezone.utc).isoformat()
+    """One-line summary of scan completion (reduced from full JSON dump)."""
     try:
-        sys.stderr.write(f"[DESK_DATA] {json.dumps(result)}\n")
-        sys.stderr.flush()
+        radar_ts = {}
+        pos_count = {}
+        for tf in ("1h", "4h", "1d"):
+            fp = os.path.join(OUT_DIR, f"gc_radar_{tf}.json")
+            try:
+                with open(fp) as f:
+                    data = json.load(f)
+                    radar_ts[tf] = data.get("ts", "")[:19]
+                    rows = data.get("rows") or []
+                    pos_count[tf] = len(rows)
+            except Exception:
+                radar_ts[tf] = "error"
+                pos_count[tf] = 0
+        sys.stderr.write(
+            f"[DESK_DATA] {datetime.now(timezone.utc).isoformat()[:19]} "
+            f"radar_1h={pos_count['1h']}@{radar_ts['1h']} "
+            f"radar_4h={pos_count['4h']}@{radar_ts['4h']} "
+            f"radar_1d={pos_count['1d']}@{radar_ts['1d']}\n"
+        )
     except Exception as e:
-        sys.stderr.write(f"[DESK_DATA] error emitting desk data: {e}\n")
+        sys.stderr.write(f"[DESK_DATA] error: {e}\n")
 
 
 def _scheduler_loop() -> None:
@@ -303,11 +285,10 @@ class Handler(SimpleHTTPRequestHandler):
                 },
             )
             return
-        # Public desk-data endpoint — no auth; used by Claude scheduled tasks
+        if self._need_auth():
+            return
         if path == "/api/desk-data":
             self._desk_data()
-            return
-        if self._need_auth():
             return
         if path in ("/", "/index.html"):
             self._send_file(UI_PATH, "text/html; charset=utf-8")
@@ -366,7 +347,10 @@ class Handler(SimpleHTTPRequestHandler):
         return rel
 
     def _sync(self) -> None:
-        """Merge-write: only replaces keys present in payload; never wipes omitted radar files."""
+        """Merge-write: only replaces keys present in payload; never wipes omitted radar files.
+        
+        Staleness guard: reject gc_radar_*.json if incoming scan timestamp is older than existing.
+        """
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length else b"{}"
         try:
@@ -379,12 +363,30 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json(400, {"ok": False, "error": "need {files:{path: content}}"})
             return
         written = []
+        skipped_stale = []
         for rel, content in files.items():
             safe = self._safe_rel(str(rel))
             if not safe:
                 self._send_json(400, {"ok": False, "error": f"bad path: {rel}"})
                 return
             dest = os.path.join(ROOT, safe)
+            
+            # Staleness check for radar JSONs
+            if safe.startswith("out/gc_radar_") and safe.endswith(".json"):
+                if isinstance(content, str):
+                    try:
+                        incoming = json.loads(content)
+                        incoming_ts = incoming.get("ts", "")
+                        if os.path.isfile(dest):
+                            with open(dest) as f:
+                                existing = json.load(f)
+                                existing_ts = existing.get("ts", "")
+                            if existing_ts and incoming_ts and incoming_ts < existing_ts:
+                                skipped_stale.append(f"{safe} (incoming={incoming_ts[:19]} < existing={existing_ts[:19]})")
+                                continue
+                    except Exception as e:
+                        sys.stderr.write(f"[sync] staleness check failed for {safe}: {e}\n")
+            
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             if isinstance(content, str):
                 data = content.encode("utf-8")
@@ -396,14 +398,16 @@ class Handler(SimpleHTTPRequestHandler):
                 f.write(data)
             os.replace(tmp, dest)
             written.append(safe)
-        self._send_json(200, {"ok": True, "written": written})
+        result = {"ok": True, "written": written}
+        if skipped_stale:
+            result["skipped_stale"] = skipped_stale
+        self._send_json(200, result)
 
     def _desk_data(self) -> None:
-        """Public endpoint — combined radar + HL data for Claude scheduled tasks.
+        """Password-gated endpoint — combined radar + HL data.
 
         Returns: gc_radar_1h, gc_radar_4h, gc_radar_1d (from volume),
                  hl_perp (clearinghouseState), hl_spot (spotClearinghouseState), ts.
-        No auth required — wallet is read-only public data.
         """
         result: dict = {}
 
