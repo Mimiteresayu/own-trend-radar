@@ -231,6 +231,7 @@ def _log_desk_data() -> None:
 
 
 def _scheduler_loop() -> None:
+    global _last_failsafe
     sys.stderr.write(
         f"[scheduler] started UTC: 1h+4h every {SCAN_INTERVAL_MIN}m; 1d@00:05 "
         f"(concurrency={SCAN_CONCURRENCY})\n"
