@@ -28,6 +28,7 @@ HOST = os.environ.get("HOST") or (
     "0.0.0.0" if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY") else "0.0.0.0"
 )
 SCAN_SCRIPT = os.path.join(ROOT, "scan_gc_radar.py")
+FAILSAFE_SCRIPT = os.path.join(ROOT, "failsafe_exit_worker.py")
 UI_PATH = os.path.join(ROOT, "ui.html")
 OUT_DIR = os.path.join(ROOT, "out")
 RESCAN_TIMEOUT_S = 1800
@@ -48,6 +49,7 @@ SCAN_CONCURRENCY = int(os.environ.get("OTR_SCAN_CONCURRENCY") or "2")
 SCAN_INTERVAL_MIN = max(5, int(os.environ.get("OTR_SCAN_INTERVAL_MIN") or "15"))
 _scan_lock = threading.Lock()
 _last_scan: dict[str, str] = {}  # tf -> slot key
+_last_failsafe: str = ""  # last failsafe run slot key (hour)
 
 # Desk-data endpoint: HL wallet (public read-only)
 HL_WALLET = os.environ.get("HL_WALLET") or "0xcFCda0F8576a268BaA17935368081F4e687dB122"
@@ -75,7 +77,36 @@ def _token_for(password: str) -> str:
     return hmac.new(SESSION_SECRET, password.encode(), hashlib.sha256).hexdigest()
 
 
-def _run_scan(tfs: list[str], max_symbols: int | None = None) -> tuple[bool, str]:
+def _run_failsafe() -> tuple[bool, str]:
+    """Run fail-safe exit worker. Returns (ok, note/error)."""
+    if not os.path.isfile(FAILSAFE_SCRIPT):
+        return False, "failsafe_exit_worker.py missing"
+    cmd = [sys.executable, FAILSAFE_SCRIPT]
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 min timeout
+        )
+    except subprocess.TimeoutExpired:
+        return False, "failsafe timed out (>300s)"
+    except OSError as e:
+        return False, str(e)
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "failsafe failed")[-1000:]
+        return False, err
+    # Success; extract status from stdout (JSON)
+    try:
+        result = json.loads(proc.stdout)
+        status = result.get("status", "unknown")
+        mode = result.get("mode", "?")
+        pos_count = len(result.get("positions", []))
+        action_count = len(result.get("actions", []))
+        return True, f"failsafe {mode} status={status} pos={pos_count} actions={action_count}"
+    except Exception:
+        return True, "failsafe ran (status unknown)"
     """Run scan_gc_radar.py for given TFs. Returns (ok, note/error)."""
     if not os.path.isfile(SCAN_SCRIPT):
         return False, "scan_gc_radar.py missing"
@@ -110,7 +141,7 @@ def _run_scan(tfs: list[str], max_symbols: int | None = None) -> tuple[bool, str
     return True, f"scanned {','.join(tfs)}"
 
 
-def _slot_key(now: datetime, kind: str) -> str:
+def _run_scan(tfs: list[str], max_symbols: int | None = None) -> tuple[bool, str]:
     """Dedup key so each schedule window runs once."""
     if kind == "1d":
         return now.strftime("%Y-%m-%d") + ":1d"
@@ -215,6 +246,18 @@ def _scheduler_loop() -> None:
                             _log_desk_data()  # emit after each scan slot for MCP relay
                 finally:
                     _scan_lock.release()
+
+            # Fail-safe worker: hourly at :05 UTC (after 1H close; 4H logic only on closed 4H bars)
+            if now.minute == 5:
+                slot = now.strftime("%Y-%m-%dT%H")
+                if _last_failsafe != slot:
+                    _last_failsafe = slot
+                    try:
+                        ok, note = _run_failsafe()
+                        sys.stderr.write(f"[scheduler] {now.isoformat()} failsafe ok={ok} {note[:300]}\n")
+                    except Exception as e:
+                        sys.stderr.write(f"[scheduler] failsafe exception (non-fatal): {e}\n")
+
         except Exception as e:
             sys.stderr.write(f"[scheduler] error: {e}\n")
         time.sleep(15)

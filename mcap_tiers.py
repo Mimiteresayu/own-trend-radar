@@ -47,12 +47,12 @@ PRIMARY_RULE = {
 }
 
 HARD_SL_BY_TIER = {
-    "mega": "4h_lower",
-    "large": "4h_lower",
+    "mega": "4h_filter",
+    "large": "4h_filter",
     "small": "4h_filter",
     "tiny": "4h_filter",
 }
-HARD_SL_RULE = "4h_lower"  # default; prefer HARD_SL_BY_TIER[tier]
+HARD_SL_RULE = "4h_filter"  # unified 2026-09-21: 4H Filter (mid, period 72) for ALL tiers
 
 
 

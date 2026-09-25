@@ -4,7 +4,7 @@
 LOCKED rules from SIZE_TIER_EXIT_LOCKED.md / HARBOR_AUTOTRADE_PROMPT_v1.md:
 - GC periods: 1D=144, 4H=72, 1H=48, Lag/Fast off, closed bars only
 - Tiers by mcap: Mega/Large → 4H Filter cross-down; Small/Tiny → 1H Lower cross-down
-- Hard SL: Mega/Large → 4H Lower; Small/Tiny → 4H Filter (mid); re-align each run
+- Hard SL: **4H Filter (mid) for ALL tiers** (unified 2026-09-21); re-aligned each run
 - Shorts: report-only (no exit logic locked yet)
 - Never opens positions
 
@@ -33,6 +33,15 @@ sys.path.insert(0, str(ROOT))
 from scan_gc_radar import fetch_candles, compute_gc, hl_post, gc_period_for_tf  # noqa: E402
 from mcap_tiers import tier_for, PRIMARY_RULE, HARD_SL_BY_TIER  # noqa: E402
 
+# Hyperliquid SDK imports (only when LIVE_MODE)
+try:
+    from hyperliquid.exchange import Exchange
+    from hyperliquid.utils import constants
+    SDK_AVAILABLE = True
+except ImportError:
+    SDK_AVAILABLE = False
+    Exchange = None
+
 OUT = ROOT / "out" / "failsafe_last.json"
 RADAR_DIR = ROOT / "out"
 STALENESS_THRESHOLD_S = 7200  # 2h; reject radar older than this
@@ -44,6 +53,32 @@ HL_API_WALLET_KEY = (os.environ.get("HL_API_WALLET_KEY") or "").strip()
 ALERT_WEBHOOK_URL = (os.environ.get("ALERT_WEBHOOK_URL") or "").strip()
 
 LIVE_MODE = ENABLE and bool(HL_API_WALLET_KEY)
+
+# Initialize SDK exchange client (lazy, only in LIVE_MODE)
+_exchange_client = None
+
+
+def _get_exchange() -> Optional[Any]:
+    """Get or create hyperliquid exchange client (LIVE_MODE only)."""
+    global _exchange_client
+    if not LIVE_MODE or not SDK_AVAILABLE:
+        return None
+    if _exchange_client is None:
+        if not HL_API_WALLET_KEY or not HL_ADDRESS:
+            sys.stderr.write("[failsafe] ERROR: LIVE_MODE but missing HL_API_WALLET_KEY or HL_ADDRESS\n")
+            return None
+        try:
+            # Exchange client with API wallet key and account_address
+            _exchange_client = Exchange(
+                account_address=HL_ADDRESS,
+                api_wallet_key=HL_API_WALLET_KEY,
+                base_url=constants.MAINNET_API_URL,
+            )
+            sys.stderr.write(f"[failsafe] SDK exchange client initialized for {HL_ADDRESS[:8]}...\n")
+        except Exception as e:
+            sys.stderr.write(f"[failsafe] ERROR: failed to init exchange client: {e}\n")
+            return None
+    return _exchange_client
 
 
 def _alert(text: str) -> None:
@@ -148,7 +183,7 @@ def _compute_long_signal(coin: str, tier: str, entry: float, size: float) -> Dic
     primary_rule = PRIMARY_RULE[tier]
     hard_sl_rule = HARD_SL_BY_TIER.get(tier, "4h_filter")
 
-    # Always need 4H for hard SL (and Mega/Large primary)
+    # Always need 4H for hard SL (unified 2026-09-21: 4H Filter for ALL tiers)
     g4 = _gc_closed(coin, "4h")
     if not g4.get("ok"):
         return {
@@ -159,7 +194,8 @@ def _compute_long_signal(coin: str, tier: str, entry: float, size: float) -> Dic
             "hard_sl_px": None,
         }
 
-    hard_sl_px = _round_trigger(g4["lower"]) if tier in ("mega", "large") else _round_trigger(g4["filter"])
+    # Hard SL = 4H Filter (mid) for ALL tiers
+    hard_sl_px = _round_trigger(g4["filter"])
 
     exit_signal = None
     primary_tf = "4h"
@@ -224,24 +260,181 @@ def _current_stop_trigger(orders: list, coin: str) -> Optional[float]:
     return None
 
 
+def _get_asset_info(coin: str) -> Optional[Dict[str, Any]]:
+    """Fetch asset metadata (szDecimals) from HL."""
+    try:
+        result = hl_post({"type": "meta"})
+        universe = result.get("universe") or []
+        for asset in universe:
+            if asset.get("name") == coin:
+                return asset
+        return None
+    except Exception as e:
+        sys.stderr.write(f"[failsafe] get_asset_info {coin} error: {e}\n")
+        return None
+
+
+def _round_size(size: float, sz_decimals: int) -> float:
+    """Round size to lot-size precision (szDecimals)."""
+    if sz_decimals <= 0:
+        return float(int(size))
+    return round(size, sz_decimals)
+
+
 def _place_market_close(coin: str, size: float, is_long: bool) -> Dict[str, Any]:
     """Place reduce-only market close via hyperliquid-python-sdk."""
-    # Placeholder: requires hyperliquid-python-sdk integration
-    # For MVP, log intent and return dry-run
-    sys.stderr.write(f"[failsafe] LIVE: place market close {coin} size={size} is_long={is_long}\n")
-    return {"action": "market_close", "coin": coin, "size": size, "is_long": is_long, "status": "dry_run"}
+    exchange = _get_exchange()
+    if not exchange:
+        sys.stderr.write(f"[failsafe] DRY_RUN: market close {coin} size={size} is_long={is_long}\n")
+        return {"action": "market_close", "coin": coin, "size": size, "is_long": is_long, "status": "dry_run"}
+
+    # Get asset metadata for size rounding
+    asset_info = _get_asset_info(coin)
+    if not asset_info:
+        return {
+            "action": "market_close",
+            "coin": coin,
+            "size": size,
+            "error": "asset_info_unavailable",
+            "status": "error",
+        }
+
+    sz_decimals = asset_info.get("szDecimals", 0)
+    rounded_size = _round_size(size, sz_decimals)
+
+    try:
+        # Market order: is_buy opposite of position side (close long = sell, close short = buy)
+        is_buy = not is_long
+        # Reduce-only IOC market order
+        order = {
+            "coin": coin,
+            "is_buy": is_buy,
+            "sz": rounded_size,
+            "limit_px": 0,  # market order (0 = market)
+            "order_type": {"limit": {"tif": "Ioc"}},  # IOC for market execution
+            "reduce_only": True,
+        }
+        result = exchange.order(order)
+        sys.stderr.write(f"[failsafe] LIVE: market close {coin} size={rounded_size} is_buy={is_buy} result={result}\n")
+        return {
+            "action": "market_close",
+            "coin": coin,
+            "size": rounded_size,
+            "is_long": is_long,
+            "order": order,
+            "result": result,
+            "status": "placed",
+        }
+    except Exception as e:
+        sys.stderr.write(f"[failsafe] ERROR: market close {coin} failed: {e}\n")
+        return {
+            "action": "market_close",
+            "coin": coin,
+            "size": rounded_size,
+            "error": str(e),
+            "status": "error",
+        }
 
 
-def _align_hard_sl(coin: str, hard_sl_px: float, current_trigger: Optional[float]) -> Optional[Dict[str, Any]]:
-    """Align hard SL trigger order if drift > 0.3%."""
+def _place_stop_trigger(coin: str, trigger_px: float, size: float) -> Dict[str, Any]:
+    """Place reduce-only stop-market trigger order for hard SL."""
+    exchange = _get_exchange()
+    if not exchange:
+        return {"action": "place_sl", "coin": coin, "trigger": trigger_px, "status": "dry_run"}
+
+    # Get asset metadata
+    asset_info = _get_asset_info(coin)
+    if not asset_info:
+        return {"action": "place_sl", "coin": coin, "trigger": trigger_px, "error": "asset_info_unavailable", "status": "error"}
+
+    sz_decimals = asset_info.get("szDecimals", 0)
+    rounded_size = _round_size(size, sz_decimals)
+
+    try:
+        # Stop-market: trigger below for longs (sell when price drops)
+        order = {
+            "coin": coin,
+            "is_buy": False,  # longs: sell on stop
+            "sz": rounded_size,
+            "limit_px": trigger_px,  # trigger price
+            "order_type": {"trigger": {"trigger_px": trigger_px, "is_market": True, "tpsl": "sl"}},
+            "reduce_only": True,
+        }
+        result = exchange.order(order)
+        sys.stderr.write(f"[failsafe] LIVE: place SL trigger {coin} @ {trigger_px} size={rounded_size} result={result}\n")
+        return {
+            "action": "place_sl",
+            "coin": coin,
+            "trigger": trigger_px,
+            "size": rounded_size,
+            "order": order,
+            "result": result,
+            "status": "placed",
+        }
+    except Exception as e:
+        sys.stderr.write(f"[failsafe] ERROR: place SL trigger {coin} failed: {e}\n")
+        return {"action": "place_sl", "coin": coin, "trigger": trigger_px, "error": str(e), "status": "error"}
+
+
+def _cancel_stop_triggers(coin: str, orders: list) -> List[Dict[str, Any]]:
+    """Cancel existing stop triggers for coin."""
+    exchange = _get_exchange()
+    if not exchange:
+        return []
+
+    cancels = []
+    for o in orders:
+        if (o.get("coin") or o.get("symbol")) != coin:
+            continue
+        if not o.get("isTrigger") and "stop" not in str(o.get("orderType") or "").lower():
+            continue
+        oid = o.get("oid")
+        if not oid:
+            continue
+        try:
+            result = exchange.cancel(coin, oid)
+            sys.stderr.write(f"[failsafe] LIVE: cancel SL {coin} oid={oid} result={result}\n")
+            cancels.append({"coin": coin, "oid": oid, "result": result, "status": "cancelled"})
+        except Exception as e:
+            sys.stderr.write(f"[failsafe] ERROR: cancel SL {coin} oid={oid} failed: {e}\n")
+            cancels.append({"coin": coin, "oid": oid, "error": str(e), "status": "error"})
+    return cancels
+
+
+def _align_hard_sl(coin: str, hard_sl_px: float, size: float, orders: list) -> Optional[Dict[str, Any]]:
+    """Align hard SL trigger order: cancel existing and place new if drift > 0.3%."""
     DRIFT_PCT = 0.3
+    current_trigger = _current_stop_trigger(orders, coin)
+
     if current_trigger is None:
+        # No existing SL: place new
         sys.stderr.write(f"[failsafe] {coin}: place hard SL trigger @ {hard_sl_px} (no existing)\n")
-        return {"action": "place_sl", "coin": coin, "trigger": hard_sl_px, "current": None}
+        if LIVE_MODE:
+            # Cancel any orphan triggers first, then place
+            cancels = _cancel_stop_triggers(coin, orders)
+            sl_result = _place_stop_trigger(coin, hard_sl_px, size)
+            return {"action": "place_sl", "coin": coin, "trigger": hard_sl_px, "current": None, "cancels": cancels, "place": sl_result}
+        else:
+            return {"action": "place_sl", "coin": coin, "trigger": hard_sl_px, "current": None, "mode": "dry_run"}
+
     drift = abs(current_trigger - hard_sl_px) / hard_sl_px * 100.0
     if drift >= DRIFT_PCT:
         sys.stderr.write(f"[failsafe] {coin}: update hard SL {current_trigger} → {hard_sl_px} (drift={drift:.2f}%)\n")
-        return {"action": "update_sl", "coin": coin, "trigger": hard_sl_px, "current": current_trigger, "drift_pct": drift}
+        if LIVE_MODE:
+            # Cancel old, place new
+            cancels = _cancel_stop_triggers(coin, orders)
+            sl_result = _place_stop_trigger(coin, hard_sl_px, size)
+            return {
+                "action": "update_sl",
+                "coin": coin,
+                "trigger": hard_sl_px,
+                "current": current_trigger,
+                "drift_pct": drift,
+                "cancels": cancels,
+                "place": sl_result,
+            }
+        else:
+            return {"action": "update_sl", "coin": coin, "trigger": hard_sl_px, "current": current_trigger, "drift_pct": drift, "mode": "dry_run"}
     return None
 
 
@@ -355,7 +548,7 @@ def run_failsafe() -> Dict[str, Any]:
 
         # Align hard SL
         if hard_sl_px:
-            sl_action = _align_hard_sl(coin, hard_sl_px, current_trigger)
+            sl_action = _align_hard_sl(coin, hard_sl_px, size, orders)
             if sl_action:
                 actions.append(sl_action)
                 if LIVE_MODE:

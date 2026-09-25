@@ -2,8 +2,8 @@
 
 | Tier | Mcap | Primary | Hard SL |
 |------|------|---------|---------|
-| Mega | ≥$50B | 4H Filter | **4H Lower** |
-| Large | $2B–<$50B | 4H Filter | **4H Lower** |
+| Mega | ≥$50B | 4H Filter | **4H Filter** |
+| Large | $2B–<$50B | 4H Filter | **4H Filter** |
 | Small | $200M–<$2B | 1H Lower | 4H Filter |
 | Tiny | <$200M | 1H Lower | 4H Filter |
 

@@ -14,8 +14,8 @@
 ## Tier (mcap ONLY) — no “組”; Mega shares rules with Large; Small with Tiny
 | Tier | Mcap | Primary exit | Hard SL |
 |------|------|--------------|---------|
-| Mega | ≥ $50B | 4H Filter cross down | **4H Lower** |
-| Large | $2B – <$50B | 4H Filter cross down | **4H Lower** |
+| Mega | ≥ $50B | 4H Filter cross down | **4H Filter mid** |
+| Large | $2B – <$50B | 4H Filter cross down | **4H Filter mid** |
 | Small | $200M – <$2B | 1H Lower cross down | 4H Filter mid |
 | Tiny | <$200M | 1H Lower cross down | 4H Filter mid |
 
@@ -30,12 +30,12 @@ Unknown mcap → Tiny.
    - **P+CR** ~**8–12%**
    - **P+N+CR** ~**10–15%**
 4. Notional ≥ $10 · **check liquidation**
-5. **Liq must be &lt; Hard SL** (longs: liq below stop — Mega/Large stop=4H Lower; Small/Tiny stop=4H Filter). Else abort / reduce lev / skip.
+5. **Liq must be &lt; Hard SL** (longs: liq below stop — ALL tiers stop=4H Filter mid). Else abort / reduce lev / skip.
 
 ## Exits (no Armed)
 - Mega / Large → 4H Filter cross down
 - Small / Tiny → 1H Lower cross down
-- Hard SL: Mega/Large → **4H Lower**; Small/Tiny → 4H Filter mid
+- Hard SL: **ALL tiers → 4H Filter mid** (unified 2026-09-21)
 
 ## Shorts
 - Signum L15 unchanged
