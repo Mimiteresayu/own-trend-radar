@@ -247,8 +247,9 @@ def _scheduler_loop() -> None:
                 finally:
                     _scan_lock.release()
 
-            # Fail-safe worker: hourly at :05 UTC (after 1H close; 4H logic only on closed 4H bars)
-            if now.minute == 5:
+            # Fail-safe worker: hourly when minute >= 5 (after 1H close at :00)
+            # Slot-based: run once per UTC hour (avoid missing :05 if loop skips that minute)
+            if now.minute >= 5:
                 slot = now.strftime("%Y-%m-%dT%H")
                 if _last_failsafe != slot:
                     _last_failsafe = slot

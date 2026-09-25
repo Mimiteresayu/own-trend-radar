@@ -281,7 +281,50 @@ def _round_size(size: float, sz_decimals: int) -> float:
     return round(size, sz_decimals)
 
 
-def _place_market_close(coin: str, size: float, is_long: bool) -> Dict[str, Any]:
+def _round_price(price: float, sz_decimals: int) -> float:
+    """Round price to HL tick rules: max 5 sig figs, price decimals = 6 - szDecimals."""
+    if price <= 0:
+        return price
+    # Price decimals = 6 - szDecimals for perps
+    price_decimals = max(0, 6 - sz_decimals)
+    rounded = round(price, price_decimals)
+    # Max 5 significant figures
+    if rounded == 0:
+        return rounded
+    # Count sig figs and truncate if needed
+    import math
+    magnitude = math.floor(math.log10(abs(rounded)))
+    sig_figs = 5
+    scale = 10 ** (sig_figs - 1 - magnitude)
+    return round(rounded * scale) / scale
+
+
+def _slippage_price(mid: float, is_buy: bool, slippage_pct: float, sz_decimals: int) -> float:
+    """Compute slippage price from mid (for market orders)."""
+    if is_buy:
+        # Buy: pay up to mid * (1 + slippage)
+        slipped = mid * (1.0 + slippage_pct / 100.0)
+    else:
+        # Sell: accept down to mid * (1 - slippage)
+        slipped = mid * (1.0 - slippage_pct / 100.0)
+    return _round_price(slipped, sz_decimals)
+
+
+def _get_mid_price(coin: str) -> Optional[float]:
+    """Fetch current mid price for coin from HL."""
+    try:
+        result = hl_post({"type": "allMids"})
+        mids = result if isinstance(result, dict) else {}
+        mid_str = mids.get(coin)
+        if mid_str:
+            return float(mid_str)
+        return None
+    except Exception as e:
+        sys.stderr.write(f"[failsafe] get_mid_price {coin} error: {e}\n")
+        return None
+
+
+def _place_market_close(coin: str, size: float, is_long: bool, slippage_pct: float = 2.0) -> Dict[str, Any]:
     """Place reduce-only market close via hyperliquid-python-sdk."""
     exchange = _get_exchange()
     if not exchange:
@@ -302,25 +345,40 @@ def _place_market_close(coin: str, size: float, is_long: bool) -> Dict[str, Any]
     sz_decimals = asset_info.get("szDecimals", 0)
     rounded_size = _round_size(size, sz_decimals)
 
+    # Get mid price for slippage calculation
+    mid = _get_mid_price(coin)
+    if not mid:
+        return {
+            "action": "market_close",
+            "coin": coin,
+            "size": rounded_size,
+            "error": "mid_price_unavailable",
+            "status": "error",
+        }
+
     try:
         # Market order: is_buy opposite of position side (close long = sell, close short = buy)
         is_buy = not is_long
-        # Reduce-only IOC market order
+        # Compute slippage price (HL rejects limit_px=0 or prices far from mid)
+        limit_px = _slippage_price(mid, is_buy, slippage_pct, sz_decimals)
+
+        # Reduce-only IOC market order with slippage limit
         order = {
             "coin": coin,
             "is_buy": is_buy,
             "sz": rounded_size,
-            "limit_px": 0,  # market order (0 = market)
+            "limit_px": limit_px,
             "order_type": {"limit": {"tif": "Ioc"}},  # IOC for market execution
             "reduce_only": True,
         }
         result = exchange.order(order)
-        sys.stderr.write(f"[failsafe] LIVE: market close {coin} size={rounded_size} is_buy={is_buy} result={result}\n")
+        sys.stderr.write(f"[failsafe] LIVE: market close {coin} size={rounded_size} is_buy={is_buy} limit_px={limit_px} result={result}\n")
         return {
             "action": "market_close",
             "coin": coin,
             "size": rounded_size,
             "is_long": is_long,
+            "limit_px": limit_px,
             "order": order,
             "result": result,
             "status": "placed",
@@ -336,7 +394,7 @@ def _place_market_close(coin: str, size: float, is_long: bool) -> Dict[str, Any]
         }
 
 
-def _place_stop_trigger(coin: str, trigger_px: float, size: float) -> Dict[str, Any]:
+def _place_stop_trigger(coin: str, trigger_px: float, size: float, slippage_pct: float = 2.0) -> Dict[str, Any]:
     """Place reduce-only stop-market trigger order for hard SL."""
     exchange = _get_exchange()
     if not exchange:
@@ -349,6 +407,13 @@ def _place_stop_trigger(coin: str, trigger_px: float, size: float) -> Dict[str, 
 
     sz_decimals = asset_info.get("szDecimals", 0)
     rounded_size = _round_size(size, sz_decimals)
+    
+    # Round trigger_px to HL tick rules
+    rounded_trigger = _round_price(trigger_px, sz_decimals)
+    
+    # Compute limit_px with slippage below trigger (longs sell on stop)
+    # Trigger fires when price drops to rounded_trigger; limit allows selling down to limit_px
+    limit_px = _round_price(rounded_trigger * (1.0 - slippage_pct / 100.0), sz_decimals)
 
     try:
         # Stop-market: trigger below for longs (sell when price drops)
@@ -356,16 +421,17 @@ def _place_stop_trigger(coin: str, trigger_px: float, size: float) -> Dict[str, 
             "coin": coin,
             "is_buy": False,  # longs: sell on stop
             "sz": rounded_size,
-            "limit_px": trigger_px,  # trigger price
-            "order_type": {"trigger": {"trigger_px": trigger_px, "is_market": True, "tpsl": "sl"}},
+            "limit_px": limit_px,  # allow fill down to this price
+            "order_type": {"trigger": {"trigger_px": rounded_trigger, "is_market": True, "tpsl": "sl"}},
             "reduce_only": True,
         }
         result = exchange.order(order)
-        sys.stderr.write(f"[failsafe] LIVE: place SL trigger {coin} @ {trigger_px} size={rounded_size} result={result}\n")
+        sys.stderr.write(f"[failsafe] LIVE: place SL trigger {coin} @ {rounded_trigger} limit_px={limit_px} size={rounded_size} result={result}\n")
         return {
             "action": "place_sl",
             "coin": coin,
-            "trigger": trigger_px,
+            "trigger": rounded_trigger,
+            "limit_px": limit_px,
             "size": rounded_size,
             "order": order,
             "result": result,
@@ -373,7 +439,7 @@ def _place_stop_trigger(coin: str, trigger_px: float, size: float) -> Dict[str, 
         }
     except Exception as e:
         sys.stderr.write(f"[failsafe] ERROR: place SL trigger {coin} failed: {e}\n")
-        return {"action": "place_sl", "coin": coin, "trigger": trigger_px, "error": str(e), "status": "error"}
+        return {"action": "place_sl", "coin": coin, "trigger": rounded_trigger, "error": str(e), "status": "error"}
 
 
 def _cancel_stop_triggers(coin: str, orders: list) -> List[Dict[str, Any]]:
