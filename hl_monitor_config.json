@@ -1,0 +1,12 @@
+{
+  "address": "0xcFCda0F8576a268BaA17935368081F4e687dB122",
+  "api_wallet_address": "0x2426b20939DaAE3948e88A02a9853423E1455782",
+  "mode": "monitor_until_signum_paused",
+  "live_trading": false,
+  "sot": {
+    "entry": "own_radar_1d_upper_crossover",
+    "exit_long": "own_radar_1h_upper_loss_per72",
+    "universe": "hl_volume_top"
+  },
+  "key_verified_at": "2026-09-16T22:59+08"
+}
