@@ -245,37 +245,81 @@ class TestEntryCandidatesLogic(unittest.TestCase):
         self.assertTrue(result["stale"])
 
     def test_hard_sl_dist_pct(self):
-        """Hard SL distance % calculated from close_1d and filter_4h."""
-        radar_1d = {
+        """Hard SL distance % calculated from close_1d and tier-correct hard SL.
+        
+        Mega/Large: hard SL = 4H Lower
+        Small/Tiny: hard SL = 4H Filter
+        """
+        # Test Mega tier (uses 4H Lower)
+        radar_1d_btc = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "rows": [
                 {
-                    "symbol": "ARB",
+                    "symbol": "BTC",  # BTC is mega tier
                     "trend": "Green",
-                    "close": 1.0,
-                    "upper": 0.95,
-                    "filter": 0.90,
+                    "close": 60000,
+                    "upper": 59000,
+                    "filter": 58000,
+                    "lower": 56000,
                     "dual_cross_up": True,
-                    "dayNtlVlm": 100000,
+                    "dayNtlVlm": 5000000,
                 },
             ],
         }
-        radar_4h = {
+        radar_4h_btc = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "rows": [
                 {
-                    "symbol": "ARB",
+                    "symbol": "BTC",
                     "trend": "Green",
-                    "filter": 0.92,
+                    "filter": 58500,
+                    "lower": 57000,  # This should be used for Mega
                     "dual_cross_up": False,
                 },
             ],
         }
         
-        result = build_candidates(radar_1d, radar_4h)
+        result = build_candidates(radar_1d_btc, radar_4h_btc)
         self.assertEqual(result["count"], 1)
-        # (1.0 - 0.92) / 1.0 * 100 = 8.0%
+        # Mega: (60000 - 57000) / 60000 * 100 = 5.0%
+        self.assertAlmostEqual(result["candidates"][0]["hard_sl_dist_pct"], 5.0, places=1)
+        self.assertEqual(result["candidates"][0]["lower_4h"], 57000)
+        
+        # Test Small/Tiny tier (uses 4H Filter)
+        radar_1d_brett = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "rows": [
+                {
+                    "symbol": "BRETT",  # BRETT is tiny tier
+                    "trend": "Green",
+                    "close": 1.0,
+                    "upper": 0.95,
+                    "filter": 0.90,
+                    "lower": 0.85,
+                    "dual_cross_up": True,
+                    "dayNtlVlm": 100000,
+                },
+            ],
+        }
+        radar_4h_brett = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "rows": [
+                {
+                    "symbol": "BRETT",
+                    "trend": "Green",
+                    "filter": 0.92,  # This should be used for Small/Tiny
+                    "lower": 0.88,
+                    "dual_cross_up": False,
+                },
+            ],
+        }
+        
+        result = build_candidates(radar_1d_brett, radar_4h_brett)
+        self.assertEqual(result["count"], 1)
+        # Small/Tiny: (1.0 - 0.92) / 1.0 * 100 = 8.0%
         self.assertAlmostEqual(result["candidates"][0]["hard_sl_dist_pct"], 8.0, places=1)
+        self.assertEqual(result["candidates"][0]["filter_4h"], 0.92)
+        self.assertEqual(result["candidates"][0]["lower_4h"], 0.88)
 
     def test_already_held_flag(self):
         """already_held flag set when symbol in positions."""
