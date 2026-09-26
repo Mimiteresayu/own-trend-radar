@@ -426,9 +426,45 @@ def execute_approved_candidates() -> Dict[str, Any]:
             })
             continue
         
-        # Build order intent
-        # Entry: limit order slightly above Hard SL (2% above)
-        entry_price = hard_sl * 1.02
+        # Determine entry price based on entry type
+        # Base/Continuation: limit at current mid price + 0.2% (for fill), capped above Hard SL with >=1.5% SL distance
+        # Add-on: limit at 4H Filter if price is above it, else skip
+        entry_price = None
+        
+        if entry_type == "Add-on":
+            # Add-on: entry at 4H Filter if price is above it
+            filter_4h = candidate.get("filter_4h", 0)
+            if not filter_4h or close_1d <= filter_4h:
+                skip_reason = f"Add-on: price ${close_1d:.2f} not above 4H Filter ${filter_4h:.2f}"
+                result["skipped"].append({
+                    "symbol": symbol,
+                    "reason": skip_reason,
+                    "size_pct": size_pct,
+                    "leverage": leverage,
+                })
+                continue
+            entry_price = filter_4h
+        else:
+            # Base/Continuation: entry at mid price + 0.2% (small offset for fill)
+            mid_price = close_1d  # Use current close as mid price
+            entry_price = mid_price * 1.002  # +0.2% offset
+        
+        # Cap entry price to ensure it stays above Hard SL with >= 1.5% SL distance
+        min_entry_for_sl_dist = hard_sl * (1 + MIN_SL_DIST_PCT / 100.0)
+        if entry_price < min_entry_for_sl_dist:
+            entry_price = min_entry_for_sl_dist
+        
+        # Verify final SL distance
+        final_sl_dist_pct = ((entry_price - hard_sl) / entry_price) * 100.0
+        if final_sl_dist_pct < MIN_SL_DIST_PCT:
+            skip_reason = f"Entry ${entry_price:.2f} too close to Hard SL ${hard_sl:.2f} (distance {final_sl_dist_pct:.2f}%)"
+            result["skipped"].append({
+                "symbol": symbol,
+                "reason": skip_reason,
+                "size_pct": size_pct,
+                "leverage": leverage,
+            })
+            continue
         
         # SL: reduce-only trigger at Hard SL
         sl_price = hard_sl
@@ -455,7 +491,7 @@ def execute_approved_candidates() -> Dict[str, Any]:
             "leverage": leverage,
             "notional_usd": notional_usd,
             "hard_sl": sl_price,
-            "sl_dist_pct": hard_sl_dist_pct,
+            "sl_dist_pct": final_sl_dist_pct,
             "expiry_utc": expiry_utc.isoformat(),
             "btc_bearish": btc_bearish,
             "estimated_liq": estimated_liq,
@@ -473,7 +509,7 @@ def execute_approved_candidates() -> Dict[str, Any]:
                 tier=tier,
                 trend_1d=trend_1d,
                 trend_4h=trend_4h,
-                sl_dist_pct=hard_sl_dist_pct,
+                sl_dist_pct=final_sl_dist_pct,
                 entry_price=entry_price,
                 entry_size=size_usd / entry_price,
                 entry_leverage=leverage,
@@ -495,7 +531,7 @@ def execute_approved_candidates() -> Dict[str, Any]:
                     tier=tier,
                     trend_1d=trend_1d,
                     trend_4h=trend_4h,
-                    sl_dist_pct=hard_sl_dist_pct,
+                    sl_dist_pct=final_sl_dist_pct,
                     entry_price=entry_price,
                     entry_size=size_usd / entry_price,
                     entry_leverage=leverage,

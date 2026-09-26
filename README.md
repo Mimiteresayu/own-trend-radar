@@ -199,8 +199,9 @@ Submit approval/veto decisions for entry candidates.
 
 ### Executor Cron
 
-Run after AI decision window (e.g., 08:55 HKT daily):
+**In-process scheduler (Railway):** The executor runs automatically via APScheduler at 08:55 HKT daily when `SCHEDULER_ENABLED=1` (default on Railway).
 
+**Manual run:**
 ```bash
 python3 executor.py
 ```
@@ -208,15 +209,21 @@ python3 executor.py
 **What it does:**
 - Fetches approved decisions from today
 - Enforces all SoT safety checks (min notional, SL distance, liq price, margin cap)
-- Places limit entry orders + reduce-only Hard SL trigger orders
+- **Entry limit price logic**:
+  - **Base/Continuation**: limit at current mid price +0.2% (for fill), capped to stay above Hard SL with >= 1.5% SL distance
+  - **Add-on**: limit at 4H Filter if price is above it, else skip
+- Places limit entry orders + reduce-only Hard SL trigger orders (expiring next 08:40 HKT)
 - Logs all trades to trade log
 - **DRY_RUN mode:** logs intended orders only
 - **LIVE mode:** executes via hyperliquid-python-sdk (when `EXEC_DRY_RUN=0` and `HL_API_PRIVATE_KEY` set)
 
 ### Exit Worker Cron
 
-Tier-based exit checks:
+**In-process scheduler (Railway):** Exit workers run automatically via APScheduler when `SCHEDULER_ENABLED=1` (default on Railway):
+- **Hourly :05**: 1H scan + Small/Tiny exits
+- **Every 4h :05**: 4H scan + Mega/Large exits
 
+**Manual run:**
 ```bash
 # Hourly (Small/Tiny: 1H close < 1H Lower)
 python3 exit_worker.py hourly
@@ -267,6 +274,7 @@ Trimmed radar feed for public consumption (e.g., giiqquant site):
 | `AI_DECISION_KEY` | No | `ENTRY_READ_KEY` | Auth key for AI endpoints (`/api/ai/candidates`, `/api/ai/decision`) |
 | `EXEC_DRY_RUN` | No | `1` | Execution mode: `1` = DRY_RUN (logs only), `0` = LIVE (requires `HL_API_PRIVATE_KEY`) |
 | `HL_API_PRIVATE_KEY` | No | - | Hyperliquid API private key for wallet `0xb74a9E2EA3e12511aDfc34a0a8327FbE4bc4e4D0` (live execution only) |
+| `SCHEDULER_ENABLED` | No | `1` (Railway) | Enable APScheduler in-process cron jobs (Asia/Hong_Kong timezone) |
 | `DECISIONS_DIR` | No | `out/decisions` | Directory for AI decision storage |
 | `TRADE_LOG_PATH` | No | `out/trades/trades.json` | Path for trade log (`.json` or `.db`/`.sqlite` for SQLite) |
 
@@ -275,19 +283,39 @@ Trimmed radar feed for public consumption (e.g., giiqquant site):
 - `ENTRY_READ_KEY`: Read-only key for `/api/entry-candidates`
 - `HL_ADDRESS`: Main wallet address (0xcFCda0F8576a268BaA17935368081F4e687dB122)
 
-### Recommended Cron Schedule (Railway)
+### Automatic Scheduling (Railway)
+
+**In-process scheduler (APScheduler):** When `SCHEDULER_ENABLED=1` (default on Railway), all cron jobs run automatically in the cockpit service process (Asia/Hong_Kong timezone):
+
+- **08:05 HKT daily**: 1D scan + generate entry candidates
+- **Hourly :05**: 1H scan + Small/Tiny exits
+- **Every 4h :05** (00, 04, 08, 12, 16, 20 HKT): 4H scan + Mega/Large exits
+- **08:55 HKT daily**: Auto-executor (executes approved candidates)
+
+**Scheduler status:**
+- Password-gated: `GET /api/scheduler/status`
+- Included in `GET /api/desk-data` under `scheduler` key
+- Shows last run time, status, message/error for each job
+
+**Lock guards:** All jobs use lock files / timestamps to prevent double runs if a job is still executing when the next trigger fires.
+
+**No manual cron setup required** — scheduler starts automatically with the web server when deployed to Railway.
+
+### Manual Cron Schedule (Alternative)
+
+If you prefer external cron (or `SCHEDULER_ENABLED=0`), use:
 
 ```bash
-# Daily scan (1D) + generate entry candidates
+# Daily scan (1D) + generate entry candidates (00:05 UTC = 08:05 HKT)
 05 00 * * * python3 scan_gc_radar.py --tf 1d && python3 entry_candidates.py
 
 # Hourly scan (1H) + Small/Tiny exits
 05 * * * * python3 scan_gc_radar.py --tf 1h && python3 exit_worker.py hourly
 
-# 4-hourly scan (4H) + Mega/Large exits
+# 4-hourly scan (4H) + Mega/Large exits (UTC hours: 00, 04, 08, 12, 16, 20)
 05 0,4,8,12,16,20 * * * python3 scan_gc_radar.py --tf 4h && python3 exit_worker.py 4h
 
-# Executor (after AI decision window, e.g., 00:55 UTC = 08:55 HKT)
+# Executor (after AI decision window, 00:55 UTC = 08:55 HKT)
 55 00 * * * python3 executor.py
 
 # Failsafe (existing, unchanged)

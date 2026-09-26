@@ -3,6 +3,7 @@
 
 Local:  python serve.py  → http://127.0.0.1:8787/  (no password unless set)
 Railway: password gate + POST /api/sync; background scanner writes out/gc_radar_*.json
+         + in-process APScheduler for auto-execution crons (Asia/Hong_Kong timezone)
 """
 from __future__ import annotations
 
@@ -38,7 +39,14 @@ COOKIE_NAME = "otr_session"
 SESSION_SECRET = (os.environ.get("SESSION_SECRET") or PASSWORD or "dev-local").encode()
 ENTRY_READ_KEY = (os.environ.get("ENTRY_READ_KEY") or "").strip()
 AI_DECISION_KEY = (os.environ.get("AI_DECISION_KEY") or ENTRY_READ_KEY or "").strip()
-# Scheduler (Railway): UTC :05 after bar close. HKT = UTC+8.
+# New auto-execution scheduler (APScheduler in-process, Asia/Hong_Kong timezone)
+SCHEDULER_ENABLED = (os.environ.get("SCHEDULER_ENABLED") or ("1" if ON_RAILWAY else "0")).strip() in (
+    "1",
+    "true",
+    "yes",
+)
+# Legacy scheduler (Railway): UTC :05 after bar close. HKT = UTC+8.
+# NOTE: OTR_SCHEDULER is now deprecated in favor of SCHEDULER_ENABLED + APScheduler
 SCHEDULER_ENABLE = (os.environ.get("OTR_SCHEDULER") or ("1" if ON_RAILWAY else "0")).strip() in (
     "1",
     "true",
@@ -65,6 +73,17 @@ except ImportError:
     store_decisions = None  # type: ignore
     get_decisions_for_today = None  # type: ignore
     get_all_trades = None  # type: ignore
+
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.cron import CronTrigger
+    import pytz
+    HAS_APSCHEDULER = True
+except ImportError:
+    HAS_APSCHEDULER = False
+    BackgroundScheduler = None  # type: ignore
+    CronTrigger = None  # type: ignore
+    pytz = None  # type: ignore
 
 # Desk-data endpoint: HL wallet (public read-only)
 HL_ADDRESS = (os.environ.get("HL_ADDRESS") or os.environ.get("HL_WALLET") or "0xcFCda0F8576a268BaA17935368081F4e687dB122").strip()
@@ -514,6 +533,294 @@ def _log_desk_data() -> None:
         sys.stderr.write(f"[DESK_DATA] error: {e}\n")
 
 
+# =====================================================================
+# APScheduler: In-process cron jobs for auto-execution
+# =====================================================================
+
+# Scheduler state tracking
+_scheduler_jobs_status: dict[str, dict] = {}
+_scheduler_lock = threading.Lock()
+
+
+def _update_job_status(job_name: str, status: str, message: str = "", error: str = "") -> None:
+    """Update scheduler job status."""
+    with _scheduler_lock:
+        _scheduler_jobs_status[job_name] = {
+            "last_run": datetime.now(timezone.utc).isoformat(),
+            "status": status,
+            "message": message,
+            "error": error,
+        }
+
+
+def _get_scheduler_status() -> dict:
+    """Get current scheduler status for all jobs."""
+    with _scheduler_lock:
+        return dict(_scheduler_jobs_status)
+
+
+def _scheduled_1d_scan() -> None:
+    """Scheduled job: 1D scan + generate entry candidates (08:05 HKT daily)."""
+    job_name = "1d_scan_candidates"
+    
+    # Lock guard
+    if not _scan_lock.acquire(blocking=False):
+        _update_job_status(job_name, "skipped", "scan already running")
+        return
+    
+    try:
+        sys.stderr.write(f"[SCHEDULER] Starting {job_name}\n")
+        
+        # 1D scan
+        ok, note = _run_scan(["1d"], max_symbols=SCAN_MAX)
+        if not ok:
+            _update_job_status(job_name, "error", "", note)
+            sys.stderr.write(f"[SCHEDULER] {job_name} scan failed: {note[:200]}\n")
+            return
+        
+        # Generate entry candidates
+        if build_candidates:
+            _generate_entry_candidates()
+        
+        _update_job_status(job_name, "success", f"1D scan complete, {note}")
+        sys.stderr.write(f"[SCHEDULER] {job_name} completed: {note[:200]}\n")
+    except Exception as e:
+        _update_job_status(job_name, "error", "", str(e))
+        sys.stderr.write(f"[SCHEDULER] {job_name} exception: {e}\n")
+    finally:
+        _scan_lock.release()
+
+
+def _scheduled_1h_scan_exits() -> None:
+    """Scheduled job: 1H scan + Small/Tiny exits (hourly :05)."""
+    job_name = "1h_scan_exits"
+    
+    # Lock guard
+    if not _scan_lock.acquire(blocking=False):
+        _update_job_status(job_name, "skipped", "scan already running")
+        return
+    
+    try:
+        sys.stderr.write(f"[SCHEDULER] Starting {job_name}\n")
+        
+        # 1H scan
+        ok, note = _run_scan(["1h"], max_symbols=SCAN_MAX_1H)
+        if not ok:
+            _update_job_status(job_name, "error", "", note)
+            sys.stderr.write(f"[SCHEDULER] {job_name} scan failed: {note[:200]}\n")
+            return
+        
+        # Small/Tiny exits
+        exit_script = os.path.join(ROOT, "exit_worker.py")
+        if os.path.isfile(exit_script):
+            try:
+                proc = subprocess.run(
+                    [sys.executable, exit_script, "hourly"],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                exit_msg = "exits OK" if proc.returncode == 0 else f"exits failed: {proc.returncode}"
+            except Exception as e:
+                exit_msg = f"exits error: {e}"
+        else:
+            exit_msg = "exit_worker.py missing"
+        
+        _update_job_status(job_name, "success", f"1H scan + {exit_msg}")
+        sys.stderr.write(f"[SCHEDULER] {job_name} completed: {note[:200]}, {exit_msg}\n")
+        _log_desk_data()
+    except Exception as e:
+        _update_job_status(job_name, "error", "", str(e))
+        sys.stderr.write(f"[SCHEDULER] {job_name} exception: {e}\n")
+    finally:
+        _scan_lock.release()
+
+
+def _scheduled_4h_scan_exits() -> None:
+    """Scheduled job: 4H scan + Mega/Large exits (every 4h :05)."""
+    job_name = "4h_scan_exits"
+    
+    # Lock guard
+    if not _scan_lock.acquire(blocking=False):
+        _update_job_status(job_name, "skipped", "scan already running")
+        return
+    
+    try:
+        sys.stderr.write(f"[SCHEDULER] Starting {job_name}\n")
+        
+        # 4H scan
+        ok, note = _run_scan(["4h"], max_symbols=SCAN_MAX)
+        if not ok:
+            _update_job_status(job_name, "error", "", note)
+            sys.stderr.write(f"[SCHEDULER] {job_name} scan failed: {note[:200]}\n")
+            return
+        
+        # Mega/Large exits
+        exit_script = os.path.join(ROOT, "exit_worker.py")
+        if os.path.isfile(exit_script):
+            try:
+                proc = subprocess.run(
+                    [sys.executable, exit_script, "4h"],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                exit_msg = "exits OK" if proc.returncode == 0 else f"exits failed: {proc.returncode}"
+            except Exception as e:
+                exit_msg = f"exits error: {e}"
+        else:
+            exit_msg = "exit_worker.py missing"
+        
+        _update_job_status(job_name, "success", f"4H scan + {exit_msg}")
+        sys.stderr.write(f"[SCHEDULER] {job_name} completed: {note[:200]}, {exit_msg}\n")
+        _log_desk_data()
+    except Exception as e:
+        _update_job_status(job_name, "error", "", str(e))
+        sys.stderr.write(f"[SCHEDULER] {job_name} exception: {e}\n")
+    finally:
+        _scan_lock.release()
+
+
+def _scheduled_executor() -> None:
+    """Scheduled job: Execute approved candidates (08:55 HKT daily)."""
+    job_name = "executor"
+    
+    try:
+        sys.stderr.write(f"[SCHEDULER] Starting {job_name}\n")
+        
+        executor_script = os.path.join(ROOT, "executor.py")
+        if not os.path.isfile(executor_script):
+            _update_job_status(job_name, "error", "", "executor.py missing")
+            return
+        
+        proc = subprocess.run(
+            [sys.executable, executor_script],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=600,  # 10 min timeout
+        )
+        
+        if proc.returncode == 0:
+            try:
+                result = json.loads(proc.stdout)
+                executed = len(result.get("executed", []))
+                actions = len(result.get("actions", []))
+                skipped = len(result.get("skipped", []))
+                mode = result.get("mode", "?")
+                status = result.get("status", "unknown")
+                msg = f"{mode} {status}: executed={executed} actions={actions} skipped={skipped}"
+                _update_job_status(job_name, "success", msg)
+                sys.stderr.write(f"[SCHEDULER] {job_name} completed: {msg}\n")
+            except Exception:
+                _update_job_status(job_name, "success", "executor ran (status unknown)")
+        else:
+            err = (proc.stderr or proc.stdout or "executor failed")[-1000:]
+            _update_job_status(job_name, "error", "", err)
+            sys.stderr.write(f"[SCHEDULER] {job_name} failed: {err[:200]}\n")
+    except subprocess.TimeoutExpired:
+        _update_job_status(job_name, "error", "", "executor timed out (>600s)")
+    except Exception as e:
+        _update_job_status(job_name, "error", "", str(e))
+        sys.stderr.write(f"[SCHEDULER] {job_name} exception: {e}\n")
+
+
+def _init_scheduler() -> BackgroundScheduler | None:
+    """Initialize APScheduler with cron jobs (Asia/Hong_Kong timezone)."""
+    if not HAS_APSCHEDULER:
+        sys.stderr.write("[SCHEDULER] APScheduler not available, skipping\n")
+        return None
+    
+    if not SCHEDULER_ENABLED:
+        sys.stderr.write("[SCHEDULER] SCHEDULER_ENABLED=0, skipping\n")
+        return None
+    
+    try:
+        hkt = pytz.timezone("Asia/Hong_Kong")
+        scheduler = BackgroundScheduler(timezone=hkt)
+        
+        # 08:05 HKT daily: 1D scan + generate entry candidates
+        scheduler.add_job(
+            _scheduled_1d_scan,
+            CronTrigger(hour=8, minute=5, timezone=hkt),
+            id="1d_scan_candidates",
+            name="1D Scan + Entry Candidates",
+            max_instances=1,
+            coalesce=True,
+        )
+        
+        # Hourly :05: 1H scan + Small/Tiny exits
+        scheduler.add_job(
+            _scheduled_1h_scan_exits,
+            CronTrigger(minute=5, timezone=hkt),
+            id="1h_scan_exits",
+            name="1H Scan + Small/Tiny Exits",
+            max_instances=1,
+            coalesce=True,
+        )
+        
+        # Every 4h :05: 4H scan + Mega/Large exits
+        scheduler.add_job(
+            _scheduled_4h_scan_exits,
+            CronTrigger(hour="0,4,8,12,16,20", minute=5, timezone=hkt),
+            id="4h_scan_exits",
+            name="4H Scan + Mega/Large Exits",
+            max_instances=1,
+            coalesce=True,
+        )
+        
+        # 08:55 HKT daily: Execute approved candidates
+        scheduler.add_job(
+            _scheduled_executor,
+            CronTrigger(hour=8, minute=55, timezone=hkt),
+            id="executor",
+            name="Auto-Executor",
+            max_instances=1,
+            coalesce=True,
+        )
+        
+        scheduler.start()
+        sys.stderr.write(
+            "[SCHEDULER] APScheduler started (Asia/Hong_Kong timezone)\n"
+            "  - 08:05 HKT: 1D scan + entry candidates\n"
+            "  - Hourly :05: 1H scan + Small/Tiny exits\n"
+            "  - Every 4h :05: 4H scan + Mega/Large exits\n"
+            "  - 08:55 HKT: Auto-executor\n"
+        )
+        return scheduler
+    except Exception as e:
+        sys.stderr.write(f"[SCHEDULER] Failed to initialize: {e}\n")
+        return None
+
+
+def _log_desk_data() -> None:
+    """One-line summary of scan completion (reduced from full JSON dump)."""
+    try:
+        radar_ts = {}
+        pos_count = {}
+        for tf in ("1h", "4h", "1d"):
+            fp = os.path.join(OUT_DIR, f"gc_radar_{tf}.json")
+            try:
+                with open(fp) as f:
+                    data = json.load(f)
+                    radar_ts[tf] = data.get("ts", "")[:19]
+                    rows = data.get("rows") or []
+                    pos_count[tf] = len(rows)
+            except Exception:
+                radar_ts[tf] = "error"
+                pos_count[tf] = 0
+        sys.stderr.write(
+            f"[DESK_DATA] {datetime.now(timezone.utc).isoformat()[:19]} "
+            f"radar_1h={pos_count['1h']}@{radar_ts['1h']} "
+            f"radar_4h={pos_count['4h']}@{radar_ts['4h']} "
+            f"radar_1d={pos_count['1d']}@{radar_ts['1d']}\n"
+        )
+    except Exception as e:
+        sys.stderr.write(f"[DESK_DATA] error: {e}\n")
+
+
 def _scheduler_loop() -> None:
     global _last_failsafe
     sys.stderr.write(
@@ -646,6 +953,7 @@ class Handler(SimpleHTTPRequestHandler):
                 {
                     "ok": True,
                     "scheduler": SCHEDULER_ENABLE,
+                    "scheduler_enabled": SCHEDULER_ENABLED,
                     "last_scan": dict(_last_scan),
                     "scanner": os.path.isfile(SCAN_SCRIPT),
                 },
@@ -659,6 +967,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if path == "/api/public/radar":
             self._public_radar()
+            return
+        if path == "/api/scheduler/status":
+            self._scheduler_status()
             return
         if self._need_auth():
             return
@@ -796,6 +1107,7 @@ class Handler(SimpleHTTPRequestHandler):
             gc_radar_1h, gc_radar_4h, gc_radar_1d (from volume),
             account (computed from Unified mode),
             positions (with tier-based stops),
+            scheduler (APScheduler job status if enabled),
             ts, address
         }
         """
@@ -828,6 +1140,10 @@ class Handler(SimpleHTTPRequestHandler):
         # 4) Compute positions with tier-based stops
         positions = _compute_positions_with_stops(hl_data, radar_1h or {}, radar_4h or {})
         result["positions"] = positions
+        
+        # 5) Scheduler status (if enabled)
+        if SCHEDULER_ENABLED:
+            result["scheduler"] = _get_scheduler_status()
         
         result["ts"] = datetime.now(timezone.utc).isoformat()
         result["address"] = HL_ADDRESS
@@ -1009,6 +1325,27 @@ class Handler(SimpleHTTPRequestHandler):
         result["ts"] = datetime.now(timezone.utc).isoformat()
         self._send_json(200, result)
 
+    def _scheduler_status(self) -> None:
+        """GET /api/scheduler/status: password-gated endpoint for scheduler job status.
+        
+        Returns:
+            enabled: bool
+            jobs: dict of job_name -> {last_run, status, message, error}
+        """
+        if not SCHEDULER_ENABLED:
+            self._send_json(200, {
+                "enabled": False,
+                "message": "Scheduler is disabled (SCHEDULER_ENABLED=0)",
+            })
+            return
+        
+        status = _get_scheduler_status()
+        self._send_json(200, {
+            "enabled": True,
+            "jobs": status,
+            "ts": datetime.now(timezone.utc).isoformat(),
+        })
+
     def _get_trades(self) -> None:
         """GET /api/trades: get all trades from trade log (password-gated).
         
@@ -1097,13 +1434,22 @@ class Handler(SimpleHTTPRequestHandler):
 def main() -> None:
     os.chdir(ROOT)
     os.makedirs(OUT_DIR, exist_ok=True)
-    if SCHEDULER_ENABLE:
+    
+    # Initialize APScheduler (new in-process scheduler)
+    scheduler = None
+    if SCHEDULER_ENABLED:
+        scheduler = _init_scheduler()
+    
+    # Start legacy scheduler thread (deprecated, only if OTR_SCHEDULER=1 and SCHEDULER_ENABLED=0)
+    if SCHEDULER_ENABLE and not SCHEDULER_ENABLED:
         t = threading.Thread(target=_scheduler_loop, name="otr-scheduler", daemon=True)
         t.start()
+    
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"Own Trend Radar UI → http://0.0.0.0:{PORT}/", flush=True)
     print(
-        f"password_gate={'on' if PASSWORD else 'off'} railway={ON_RAILWAY} scheduler={SCHEDULER_ENABLE}",
+        f"password_gate={'on' if PASSWORD else 'off'} railway={ON_RAILWAY} "
+        f"scheduler_enabled={SCHEDULER_ENABLED} legacy_scheduler={SCHEDULER_ENABLE}",
         flush=True,
     )
     try:
@@ -1111,6 +1457,8 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\nbye", flush=True)
     finally:
+        if scheduler:
+            scheduler.shutdown()
         server.server_close()
 
 
