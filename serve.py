@@ -58,8 +58,13 @@ except ImportError:
     build_candidates = None  # type: ignore
 
 # Desk-data endpoint: HL wallet (public read-only)
-HL_WALLET = os.environ.get("HL_WALLET") or "0xcFCda0F8576a268BaA17935368081F4e687dB122"
+HL_ADDRESS = (os.environ.get("HL_ADDRESS") or os.environ.get("HL_WALLET") or "0xcFCda0F8576a268BaA17935368081F4e687dB122").strip()
 HL_API_URL = "https://api.hyperliquid.xyz/info"
+
+# Cache for HL data (avoid rate limits)
+_hl_cache: dict = {}  # {"ts": timestamp, "data": {...}}
+_hl_cache_lock = threading.Lock()
+HL_CACHE_TTL_S = 45  # 45s cache to stay fresh but not hammer API
 
 LOGIN_HTML = """<!doctype html><html><head><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\">
 <title>Own Trend Radar</title>
@@ -207,6 +212,273 @@ def _generate_entry_candidates() -> None:
         sys.stderr.write(f"[entry_candidates] error (non-fatal): {e}\n")
 
 
+def _fetch_hl_live() -> dict:
+    """Fetch fresh HL clearinghouse + spot state for HL_ADDRESS (no cache).
+    
+    Returns: {
+        "hl_perp": clearinghouseState,
+        "hl_spot": spotClearinghouseState,
+        "ts": ISO timestamp,
+        "address": HL_ADDRESS
+    }
+    """
+    result: dict = {"address": HL_ADDRESS, "ts": datetime.now(timezone.utc).isoformat()}
+    
+    for req_type, key in [
+        ("clearinghouseState", "hl_perp"),
+        ("spotClearinghouseState", "hl_spot"),
+    ]:
+        try:
+            payload = json.dumps({"type": req_type, "user": HL_ADDRESS}).encode()
+            req = _url_req.Request(
+                HL_API_URL,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with _url_req.urlopen(req, timeout=15) as resp:
+                result[key] = json.loads(resp.read())
+        except Exception as e:
+            result[key] = {"error": str(e)}
+    
+    return result
+
+
+def _get_hl_cached() -> dict:
+    """Get cached HL data or fetch fresh if cache expired."""
+    global _hl_cache
+    now = time.time()
+    
+    with _hl_cache_lock:
+        cached = _hl_cache.get("data")
+        ts = _hl_cache.get("ts", 0)
+        
+        if cached and (now - ts) < HL_CACHE_TTL_S:
+            return cached
+        
+        # Fetch fresh
+        fresh = _fetch_hl_live()
+        _hl_cache = {"ts": now, "data": fresh}
+        return fresh
+
+
+def _compute_unified_equity(hl_data: dict) -> dict:
+    """Compute Unified mode equity from HL API response.
+    
+    Unified mode: equity = spot USDC total; perp accountValue ≈ 0 even when funded.
+    Free USDC = spot USDC - margin used.
+    
+    Returns: {
+        "equity": float,
+        "spot_usdc": float,
+        "margin_used": float,
+        "spot_usdc_free": float,
+        "uPnL_sum": float,
+        "ts": ISO string
+    }
+    """
+    hl_spot = hl_data.get("hl_spot", {})
+    hl_perp = hl_data.get("hl_perp", {})
+    
+    # Spot USDC balance (source of truth in Unified)
+    balances = hl_spot.get("balances", [])
+    spot_usdc = 0.0
+    for bal in balances:
+        if bal.get("coin") == "USDC":
+            try:
+                spot_usdc = float(bal.get("total", 0))
+            except (TypeError, ValueError):
+                pass
+            break
+    
+    # Margin used from perp state
+    margin_summary = hl_perp.get("marginSummary", {})
+    try:
+        margin_used = float(margin_summary.get("totalMarginUsed", 0))
+    except (TypeError, ValueError):
+        margin_used = 0.0
+    
+    # uPnL from perp positions
+    upnl_sum = 0.0
+    positions = hl_perp.get("assetPositions", [])
+    for pos_group in positions:
+        position = pos_group.get("position", {})
+        if not position:
+            continue
+        try:
+            upnl = float(position.get("unrealizedPnl", 0))
+            upnl_sum += upnl
+        except (TypeError, ValueError):
+            pass
+    
+    # Equity = spot USDC (in Unified mode)
+    equity = spot_usdc
+    
+    # Free USDC = spot USDC - margin used
+    free_usdc = max(0, spot_usdc - margin_used)
+    
+    return {
+        "equity": equity,
+        "spot_usdc": spot_usdc,
+        "margin_used": margin_used,
+        "spot_usdc_free": free_usdc,
+        "uPnL_sum": upnl_sum,
+        "ts": hl_data.get("ts", ""),
+    }
+
+
+def _compute_positions_with_stops(hl_data: dict, radar_1h: dict, radar_4h: dict) -> list:
+    """Compute position rows with tier-based stops from radar.
+    
+    Returns list of dicts with:
+        coin, side, size, entry, positionValue, uPnL, leverage, liquidation_px,
+        tier, primary_exit, hard_sl, sl_dist_pct, exit_signal, liq_beyond_sl
+    """
+    try:
+        from mcap_tiers import tier_for
+    except ImportError:
+        tier_for = None  # type: ignore
+    
+    hl_perp = hl_data.get("hl_perp", {})
+    positions_raw = hl_perp.get("assetPositions", [])
+    
+    # Build radar maps
+    r1h_map = {}
+    r4h_map = {}
+    if radar_1h and radar_1h.get("rows"):
+        for r in radar_1h["rows"]:
+            r1h_map[r["symbol"]] = r
+    if radar_4h and radar_4h.get("rows"):
+        for r in radar_4h["rows"]:
+            r4h_map[r["symbol"]] = r
+    
+    result = []
+    
+    for pos_group in positions_raw:
+        position = pos_group.get("position", {})
+        if not position:
+            continue
+        
+        coin = position.get("coin", "")
+        if not coin:
+            continue
+        
+        # Extract position data
+        try:
+            szi = float(position.get("szi", 0))
+            entry_px = float(position.get("entryPx", 0))
+            position_value = float(position.get("positionValue", 0))
+            unrealized_pnl = float(position.get("unrealizedPnl", 0))
+            leverage_val = position.get("leverage", {})
+            leverage = float(leverage_val.get("value", 0)) if isinstance(leverage_val, dict) else 0.0
+            liquidation_px = float(position.get("liquidationPx") or 0)
+        except (TypeError, ValueError):
+            continue
+        
+        if abs(szi) < 1e-8:  # Skip zero positions
+            continue
+        
+        side = "LONG" if szi > 0 else "SHORT"
+        size = abs(szi)
+        
+        # Tier
+        tier = "tiny"
+        if tier_for:
+            tier = tier_for(coin)
+        
+        # Get radar rows
+        r1h = r1h_map.get(coin) or r1h_map.get(f"{coin}-PERP")
+        r4h = r4h_map.get(coin) or r4h_map.get(f"{coin}-PERP")
+        
+        # Tier-based stops (Mega/Large: 4H Filter primary, 4H Lower hard SL)
+        # (Small/Tiny: 1H Lower primary, 4H Filter hard SL)
+        # NOTE: Current spec says ALL tiers use 4H Filter as Hard SL (unified 2026-09-21)
+        # but primary exit differs by tier
+        primary_exit_level = None
+        primary_exit_label = ""
+        hard_sl_level = None
+        hard_sl_label = "4H Filter"
+        
+        if tier in ("mega", "large"):
+            # Primary exit: 4H close < 4H Filter
+            if r4h:
+                primary_exit_level = r4h.get("filter")
+                primary_exit_label = "4H Filter"
+                hard_sl_level = r4h.get("lower")  # 4H Lower is hard SL for Mega/Large
+                hard_sl_label = "4H Lower"
+        else:  # small, tiny
+            # Primary exit: 1H close < 1H Lower
+            if r1h:
+                primary_exit_level = r1h.get("lower")
+                primary_exit_label = "1H Lower"
+            # Hard SL: 4H Filter (mid)
+            if r4h:
+                hard_sl_level = r4h.get("filter")
+                hard_sl_label = "4H Filter"
+        
+        # SL distance %
+        sl_dist_pct = None
+        if hard_sl_level and entry_px:
+            sl_dist_pct = round((hard_sl_level - entry_px) / entry_px * 100, 2)
+        
+        # Exit signal logic
+        exit_signal = "HOLD"
+        if tier in ("mega", "large") and r4h:
+            # Check if 4H close < 4H filter
+            close_4h = r4h.get("close")
+            filt_4h = r4h.get("filter")
+            trend_4h = r4h.get("trend")
+            if close_4h and filt_4h and close_4h < filt_4h:
+                exit_signal = "EXIT 4H"
+            elif trend_4h == "Red":
+                exit_signal = "WATCH"
+        elif tier in ("small", "tiny") and r1h:
+            # Check if 1H close < 1H lower
+            close_1h = r1h.get("close")
+            lower_1h = r1h.get("lower")
+            trend_1h = r1h.get("trend")
+            if close_1h and lower_1h and close_1h < lower_1h:
+                exit_signal = "EXIT 1H"
+            elif trend_1h == "Red":
+                exit_signal = "WATCH"
+        else:
+            # Fallback: check both TFs for red trend
+            if (r4h and r4h.get("trend") == "Red") or (r1h and r1h.get("trend") == "Red"):
+                exit_signal = "WATCH"
+        
+        # Check if liquidation price is beyond hard SL (safe if true)
+        liq_beyond_sl = None
+        if liquidation_px and hard_sl_level:
+            if side == "LONG":
+                liq_beyond_sl = liquidation_px < hard_sl_level  # liq lower than SL = safe
+            else:
+                liq_beyond_sl = liquidation_px > hard_sl_level  # liq higher than SL = safe
+        
+        result.append({
+            "coin": coin,
+            "side": side,
+            "size": size,
+            "entry": entry_px,
+            "positionValue": position_value,
+            "uPnL": unrealized_pnl,
+            "leverage": leverage,
+            "liquidation_px": liquidation_px,
+            "tier": tier,
+            "primary_exit": primary_exit_level,
+            "primary_exit_label": primary_exit_label,
+            "hard_sl": hard_sl_level,
+            "hard_sl_label": hard_sl_label,
+            "sl_dist_pct": sl_dist_pct,
+            "exit_signal": exit_signal,
+            "liq_beyond_sl": liq_beyond_sl,
+            # Include radar trends for UI
+            "trend_1h": r1h.get("trend") if r1h else None,
+            "trend_4h": r4h.get("trend") if r4h else None,
+        })
+    
+    return result
+
+
 def _log_desk_data() -> None:
     """One-line summary of scan completion (reduced from full JSON dump)."""
     try:
@@ -349,11 +621,10 @@ class Handler(SimpleHTTPRequestHandler):
     def _send_login(self, err: str = "") -> None:
         html = LOGIN_HTML.replace("__ERR__", f'<p class=err>{err}</p>' if err else "")
         body = html.encode()
-        self.send_response(401)
+        self.send_response(200)  # Return 200 for login form (not 401)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
-        self.send_header("WWW-Authenticate", 'Bearer realm="otr"')
         self.end_headers()
         self.wfile.write(body)
 
@@ -498,41 +769,47 @@ class Handler(SimpleHTTPRequestHandler):
         self._send_json(200, result)
 
     def _desk_data(self) -> None:
-        """Password-gated endpoint — combined radar + HL data.
+        """Password-gated endpoint — combined radar + HL live data (cached 45s).
 
-        Returns: gc_radar_1h, gc_radar_4h, gc_radar_1d (from volume),
-                 hl_perp (clearinghouseState), hl_spot (spotClearinghouseState), ts.
+        Returns: {
+            gc_radar_1h, gc_radar_4h, gc_radar_1d (from volume),
+            account (computed from Unified mode),
+            positions (with tier-based stops),
+            ts, address
+        }
         """
         result: dict = {}
 
         # 1) Radar JSONs from volume mount
+        radar_1h = None
+        radar_4h = None
         for tf in ("1h", "4h", "1d"):
             fp = os.path.join(OUT_DIR, f"gc_radar_{tf}.json")
             try:
                 with open(fp) as f:
-                    result[f"gc_radar_{tf}"] = json.load(f)
+                    data = json.load(f)
+                    result[f"gc_radar_{tf}"] = data
+                    if tf == "1h":
+                        radar_1h = data
+                    elif tf == "4h":
+                        radar_4h = data
             except Exception as e:
                 result[f"gc_radar_{tf}"] = {"error": str(e)}
 
-        # 2) HL position data (Railway has unrestricted egress)
-        for req_type, key in [
-            ("clearinghouseState", "hl_perp"),
-            ("spotClearinghouseState", "hl_spot"),
-        ]:
-            try:
-                payload = json.dumps({"type": req_type, "user": HL_WALLET}).encode()
-                req = _url_req.Request(
-                    HL_API_URL,
-                    data=payload,
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
-                )
-                with _url_req.urlopen(req, timeout=15) as resp:
-                    result[key] = json.loads(resp.read())
-            except Exception as e:
-                result[key] = {"error": str(e)}
-
+        # 2) HL data (cached)
+        hl_data = _get_hl_cached()
+        result["hl_data"] = hl_data
+        
+        # 3) Compute Unified equity
+        account = _compute_unified_equity(hl_data)
+        result["account"] = account
+        
+        # 4) Compute positions with tier-based stops
+        positions = _compute_positions_with_stops(hl_data, radar_1h or {}, radar_4h or {})
+        result["positions"] = positions
+        
         result["ts"] = datetime.now(timezone.utc).isoformat()
+        result["address"] = HL_ADDRESS
         self._send_json(200, result)
 
     def _send_file(self, filepath: str, content_type: str) -> None:

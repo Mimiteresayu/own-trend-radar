@@ -881,7 +881,7 @@
 
   async function refreshDeskData() {
     try {
-      const r = await fetch("out/desk_daily.json?t="+Date.now(), {cache:"no-store"});
+      const r = await fetch("/api/desk-data?t="+Date.now(), {cache:"no-store"});
       if (r.ok) deskData = await r.json();
     } catch {}
   }
@@ -920,6 +920,13 @@
       span.textContent = ts ? ageStr(ts) : "—";
       span.className = ts ? ageCls(ts, tf==="1d"?1200:25, tf==="1d"?2880:90) : "err";
     });
+    
+    // HL data freshness
+    if (deskData && deskData.hl_data && deskData.hl_data.ts) {
+      const hlAge = ageStr(deskData.hl_data.ts);
+      const hlCls = ageCls(deskData.hl_data.ts, 2, 5);  // warn if >2min, err if >5min
+      el("frMeta").innerHTML = `HL: <span class="${hlCls}">${hlAge}</span> · Last refresh: ${new Date().toLocaleTimeString("en-GB",{timeZone:"Asia/Hong_Kong"})} HKT`;
+    }
   }
 
   // ── HKT Clock ─────────────────────────────────────────────────────────
@@ -956,7 +963,7 @@
     const a = d && d.account || {};
     const pos = d && d.positions || [];
 
-    const eq     = Number(a.equity ?? a.total_eq ?? a.spot_usdc) || 0;
+    const eq     = Number(a.equity) || 0;
     const upnl   = Number(a.uPnL_sum) || 0;
     const margin = Number(a.margin_used) || 0;
     const free   = Number(a.spot_usdc_free) || 0;
@@ -997,13 +1004,7 @@
     el("legLong").textContent  = "Long "+longs.length;
     el("legShort").textContent = "Short "+shorts.length;
 
-    // Build radar lookup maps for position overlay
-    const gcMap1h = {};
-    const gcMap4h = {};
-    if (radar["1h"] && radar["1h"].rows) radar["1h"].rows.forEach(r => { gcMap1h[r.symbol] = r; });
-    if (radar["4h"] && radar["4h"].rows) radar["4h"].rows.forEach(r => { gcMap4h[r.symbol] = r; });
-
-    // Positions table with GC overlay
+    // Positions table (server now computes stops and exit signals)
     el("ckPosHead").textContent = pos.length ? "("+pos.length+")" : "";
     el("ckPosBody").innerHTML = pos.length
       ? pos.map(p => {
@@ -1011,40 +1012,28 @@
           const side = String(p.side||"").toUpperCase();
           const uPnL = Number(p.uPnL) || 0;
           const cls  = signedCls(uPnL);
-          const r1h  = gcMap1h[coin] || gcMap1h[coin+"-PERP"] || null;
-          const r4h  = gcMap4h[coin] || gcMap4h[coin+"-PERP"] || null;
 
-          // GC cell
-          const gc1hTrend = r1h ? r1h.trend : "—";
-          const gc4hTrend = r4h ? r4h.trend : "—";
+          // GC cell (from server trends)
+          const gc1hTrend = p.trend_1h || "—";
+          const gc4hTrend = p.trend_4h || "—";
           const gc1hCls   = gc1hTrend==="Green"?"gc-g":gc1hTrend==="Red"?"gc-r":"gc-m";
           const gc4hCls   = gc4hTrend==="Green"?"gc-g":gc4hTrend==="Red"?"gc-r":"gc-m";
           const gcCell = `<div class="gc-cell"><span class="gc-1h ${gc1hCls}">1H ${gc1hTrend}</span><span class="gc-4h ${gc4hCls}">4H ${gc4hTrend}</span></div>`;
 
-          // SL = 4H filter
-          const sl4h   = r4h ? r4h.filter : (p.h4_filter ?? null);
-          const slText = sl4h != null ? fmtNum(sl4h) : "—";
-          const entry  = Number(p.entry) || 0;
-          const slGapPct = sl4h && entry ? ((Number(sl4h)-entry)/entry*100) : null;
+          // Hard SL (server computed)
+          const slText = p.hard_sl != null ? fmtNum(p.hard_sl) : "—";
+          const slLabel = p.hard_sl_label || "SL";
+          const slGapPct = p.sl_dist_pct;
           const slGapText = slGapPct != null ? fmtPct(slGapPct,2) : "—";
           const slGapCls  = slGapPct != null ? (slGapPct < -8 ? "neg" : slGapPct < -3 ? "amber" : "pos") : "";
 
-          // Exit signal from tier SoT
-          // Mega/Large exit: 4H close < 4H filter → check if close < filter
-          // Small/Tiny exit: 1H close < 1H lower
-          let exitSignal = "HOLD";
+          // Exit signal (from server)
+          const exitSignal = p.exit_signal || "HOLD";
           let rowCls = "";
-          const tier = p.tier || "";
-          if (r4h && (tier==="mega"||tier==="large")) {
-            const close4h = r4h.close, filt4h = r4h.filter;
-            if (close4h && filt4h && close4h < filt4h) { exitSignal="EXIT 4H"; rowCls="hl-down"; }
-            else if (gc4hTrend==="Red") { exitSignal="WATCH"; rowCls="hl-watch"; }
-          } else if (r1h && (tier==="small"||tier==="tiny")) {
-            const close1h = r1h.close, lower1h = r1h.lower;
-            if (close1h && lower1h && close1h < lower1h) { exitSignal="EXIT 1H"; rowCls="hl-down"; }
-            else if (gc1hTrend==="Red") { exitSignal="WATCH"; rowCls="hl-watch"; }
-          } else if (gc4hTrend==="Red"||gc1hTrend==="Red") {
-            exitSignal="WATCH"; rowCls="hl-watch";
+          if (exitSignal.startsWith("EXIT")) {
+            rowCls = "hl-down";
+          } else if (exitSignal === "WATCH") {
+            rowCls = "hl-watch";
           }
 
           const sigBadge = exitSignal.startsWith("EXIT")
@@ -1053,17 +1042,21 @@
               ? `<span class="watch-badge">WATCH</span>`
               : `<span class="hold-badge">HOLD</span>`;
 
+          // Liquidation safety check
+          const liqSafe = p.liq_beyond_sl;
+          const liqWarning = (liqSafe === false) ? ' <span style="color:var(--red);font-size:0.65rem">⚠ LIQ</span>' : '';
+
           return `<tr class="${rowCls}">
             <td><strong>${esc(coin)}</strong></td>
             <td class="${side==="LONG"?"pos":"neg"}">${side}</td>
-            <td>${p.size??p.sz??"—"}</td>
+            <td>${fmtNum(p.size)}</td>
             <td>${fmtNum(p.entry)}</td>
             <td>${fmtUsd(p.positionValue)}</td>
             <td class="${cls}">${fmtUsd(uPnL)}</td>
             <td>${p.leverage??"—"}x</td>
             <td>${gcCell}</td>
-            <td class="sl-cell">${slText}</td>
-            <td class="${slGapCls}">${slGapText}</td>
+            <td class="sl-cell">${slText}<br><span style="font-size:0.65rem;color:var(--muted)">${slLabel}</span></td>
+            <td class="${slGapCls}">${slGapText}${liqWarning}</td>
             <td>${sigBadge}</td>
           </tr>`;
         }).join("")

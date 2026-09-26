@@ -144,16 +144,26 @@ def build_candidates(
         close_1d = r1d.get("close")
         upper_1d = r1d.get("upper")
         filter_1d = r1d.get("filter")
+        lower_1d = r1d.get("lower")
         filter_4h = r4h.get("filter") if r4h else None
+        lower_4h = r4h.get("lower") if r4h else None
         day_ntl_vlm = r1d.get("day_ntl_vlm") or r1d.get("dayNtlVlm")
-        
-        # Hard SL distance (4H Filter is the Hard SL level)
-        hard_sl_dist_pct = None
-        if close_1d and filter_4h:
-            hard_sl_dist_pct = round((close_1d - filter_4h) / close_1d * 100, 2)
         
         # Tier
         tier = tier_for(symbol) if tier_for else "unknown"
+        
+        # Hard SL distance (tier-dependent)
+        # Mega/Large: Hard SL = 4H Lower
+        # Small/Tiny: Hard SL = 4H Filter (mid)
+        hard_sl_dist_pct = None
+        hard_sl_level = None
+        if tier in ("mega", "large"):
+            hard_sl_level = lower_4h
+        else:  # small, tiny, unknown
+            hard_sl_level = filter_4h
+        
+        if close_1d and hard_sl_level:
+            hard_sl_dist_pct = round((close_1d - hard_sl_level) / close_1d * 100, 2)
         
         # Already held
         already_held = symbol in held_symbols
@@ -167,7 +177,9 @@ def build_candidates(
             "close_1d": close_1d,
             "upper_1d": upper_1d,
             "filter_1d": filter_1d,
+            "lower_1d": lower_1d,
             "filter_4h": filter_4h,
+            "lower_4h": lower_4h,
             "hard_sl_dist_pct": hard_sl_dist_pct,
             "dayNtlVlm": day_ntl_vlm,
             "already_held": already_held,
