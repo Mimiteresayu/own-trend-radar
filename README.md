@@ -1,7 +1,8 @@
-# Own Trend Radar — Multi-TF GC Scan
+# Own Trend Radar — Multi-TF GC Scan + Auto-Execution
 
 Lean DRY_RUN scanner for Hyperliquid perps using DonovanWall Gaussian Channel
-math (Signum Strategy v3.3 params). Supports **1h / 4h / 1d**.
+math (Signum Strategy v3.3 params). Supports **1h / 4h / 1d** with auto-execution
+for approved entry candidates.
 
 ## GC params (locked)
 
@@ -78,6 +79,237 @@ Open `ui_snapshot.html` in a browser (`file://`). It inlines available TF JSON
 python scan_gc_radar.py
 python build_snapshot.py
 ```
+
+## Universe (Signum-scale Top 100–150)
+
+1. **Primary:** HL `metaAndAssetCtxs` ranked by `dayNtlVlm` (24h notional) — top **150**
+2. **Fallback if vols are zero:** `/workspace/hl_volume_top100.json`, then pad from meta universe names to 150
+3. **Secondary only:** `own_radar_candidates_base_v0.json` may filter/reorder; never the primary cap
+
+Same universe is shared across all TFs in one run.
+
+## Auto-Execution System (NEW)
+
+### Overview
+
+The auto-execution system allows an external AI to review daily entry candidates,
+approve/veto them with size and leverage parameters, and automatically execute
+approved trades via Hyperliquid API. The system enforces Source of Truth (SoT)
+trading rules, including:
+
+- Min notional $10, leverage 1-5x
+- SL distance >= 1.5%
+- Liquidation price must be beyond Hard SL
+- Total margin utilization <= 80% equity
+- BTC regime-aware sizing (4% per coin when BTC 4H close < 4H Filter)
+
+**Default mode: DRY_RUN** (logs only, no live orders)
+**Live mode: requires `EXEC_DRY_RUN=0` AND `HL_API_PRIVATE_KEY` set**
+
+### AI Integration Endpoints
+
+#### 1. GET `/api/ai/candidates?key=<AI_DECISION_KEY>`
+
+Fetch today's entry candidates with enhanced data for AI decision-making.
+
+**Auth:** Query parameter `key` must match `AI_DECISION_KEY` env var
+
+**Returns:**
+```json
+{
+  "generated_at": "2026-09-26T08:00:00Z",
+  "radar_1d_asof": "2026-09-26T00:05:00Z",
+  "radar_4h_asof": "2026-09-26T08:05:00Z",
+  "stale": false,
+  "btc": {
+    "trend_1d": "Green",
+    "close_vs_filter_1d": 2.5,
+    "trend_4h": "Green",
+    "close_vs_filter_4h": 1.8
+  },
+  "count": 12,
+  "candidates": [
+    {
+      "symbol": "BTC",
+      "type": "Base",
+      "tier": "mega",
+      "trend_1d": "Green",
+      "trend_4h": "Green",
+      "close_1d": 60000,
+      "upper_1d": 59000,
+      "filter_4h": 58500,
+      "lower_4h": 57000,
+      "hard_sl_dist_pct": 5.0,
+      "suggested_size_pct": 6.0,
+      "suggested_leverage": 2.5,
+      "estimated_liq_price": 56000,
+      "already_held": false
+    }
+  ],
+  "account": {
+    "equity": 10000.0,
+    "margin_used": 2000.0,
+    "spot_usdc_free": 8000.0
+  }
+}
+```
+
+#### 2. POST `/api/ai/decision`
+
+Submit approval/veto decisions for entry candidates.
+
+**Auth:** Header `X-AI-Key` or query parameter `key` must match `AI_DECISION_KEY`
+
+**Request Body:**
+```json
+{
+  "decisions": [
+    {
+      "symbol": "BTC",
+      "decision": "approve",
+      "size_pct": 6.0,
+      "leverage": 3.0,
+      "reason": "Strong 1D uptrend, low SL distance, BTC regime bullish"
+    },
+    {
+      "symbol": "ETH",
+      "decision": "veto",
+      "size_pct": null,
+      "leverage": null,
+      "reason": "Already at max position count"
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true,
+  "stored_count": 2,
+  "file_path": "/workspace/out/decisions/decisions_20260926.json",
+  "timestamp": "2026-09-26T08:30:00Z"
+}
+```
+
+**Notes:**
+- Size and leverage are clamped server-side to SoT bands
+- Decisions are keyed by symbol + date
+- Only approved candidates will be executed by the executor cron
+
+### Executor Cron
+
+Run after AI decision window (e.g., 08:55 HKT daily):
+
+```bash
+python3 executor.py
+```
+
+**What it does:**
+- Fetches approved decisions from today
+- Enforces all SoT safety checks (min notional, SL distance, liq price, margin cap)
+- Places limit entry orders + reduce-only Hard SL trigger orders
+- Logs all trades to trade log
+- **DRY_RUN mode:** logs intended orders only
+- **LIVE mode:** executes via hyperliquid-python-sdk (when `EXEC_DRY_RUN=0` and `HL_API_PRIVATE_KEY` set)
+
+### Exit Worker Cron
+
+Tier-based exit checks:
+
+```bash
+# Hourly (Small/Tiny: 1H close < 1H Lower)
+python3 exit_worker.py hourly
+
+# 4-hourly (Mega/Large: 4H close < 4H Filter)
+python3 exit_worker.py 4h
+
+# All tiers
+python3 exit_worker.py all
+```
+
+**What it does:**
+- Checks open positions for primary exit signals
+- Mega/Large: 4H close < 4H Filter
+- Small/Tiny: 1H close < 1H Lower
+- Computes MAE/MFE/R multiple and logs exits
+- **DRY_RUN mode:** logs intended exits only
+- **LIVE mode:** places market sell orders
+
+### Trade Log
+
+All entries and exits are logged to track performance:
+
+```bash
+# View trades
+python3 -c "from trade_log import get_all_trades; import json; print(json.dumps(get_all_trades(), indent=2))"
+```
+
+**Storage:** JSON or SQLite (configurable via `TRADE_LOG_PATH`)
+
+**Trade record includes:**
+- Entry: type, tier, 1D/4H colors, SL distance, entry price/size/leverage, AI decision reason
+- Exit: exit price, exit reason, MAE/MFE %, R multiple, PnL USD
+- Dry run flag
+
+### Public Radar Endpoint
+
+**GET `/api/public/radar`** (no auth required)
+
+Trimmed radar feed for public consumption (e.g., giiqquant site):
+- Returns: `gc_radar_1h`, `gc_radar_4h`, `gc_radar_1d`
+- No positions, no account data, no keys required
+
+### Environment Variables (NEW)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AI_DECISION_KEY` | No | `ENTRY_READ_KEY` | Auth key for AI endpoints (`/api/ai/candidates`, `/api/ai/decision`) |
+| `EXEC_DRY_RUN` | No | `1` | Execution mode: `1` = DRY_RUN (logs only), `0` = LIVE (requires `HL_API_PRIVATE_KEY`) |
+| `HL_API_PRIVATE_KEY` | No | - | Hyperliquid API private key for wallet `0xb74a9E2EA3e12511aDfc34a0a8327FbE4bc4e4D0` (live execution only) |
+| `DECISIONS_DIR` | No | `out/decisions` | Directory for AI decision storage |
+| `TRADE_LOG_PATH` | No | `out/trades/trades.json` | Path for trade log (`.json` or `.db`/`.sqlite` for SQLite) |
+
+**Existing variables:**
+- `COCKPIT_PASSWORD`: Password gate for UI and `/api/desk-data`
+- `ENTRY_READ_KEY`: Read-only key for `/api/entry-candidates`
+- `HL_ADDRESS`: Main wallet address (0xcFCda0F8576a268BaA17935368081F4e687dB122)
+
+### Recommended Cron Schedule (Railway)
+
+```bash
+# Daily scan (1D) + generate entry candidates
+05 00 * * * python3 scan_gc_radar.py --tf 1d && python3 entry_candidates.py
+
+# Hourly scan (1H) + Small/Tiny exits
+05 * * * * python3 scan_gc_radar.py --tf 1h && python3 exit_worker.py hourly
+
+# 4-hourly scan (4H) + Mega/Large exits
+05 0,4,8,12,16,20 * * * python3 scan_gc_radar.py --tf 4h && python3 exit_worker.py 4h
+
+# Executor (after AI decision window, e.g., 00:55 UTC = 08:55 HKT)
+55 00 * * * python3 executor.py
+
+# Failsafe (existing, unchanged)
+10 * * * * python3 failsafe_exit_worker.py
+```
+
+**AI Workflow:**
+1. At ~08:30 HKT (00:30 UTC), external AI calls `GET /api/ai/candidates?key=<key>`
+2. AI reviews candidates, makes decisions (approve/veto with size/leverage)
+3. AI submits decisions via `POST /api/ai/decision` with body `{"decisions": [...]}`
+4. At 08:55 HKT (00:55 UTC), executor cron runs and executes approved candidates
+5. Hourly/4-hourly exit crons check and close positions on primary exit signals
+
+### Testing
+
+Run all tests:
+```bash
+python3 test_entry_candidates.py   # Existing: 12 tests
+python3 test_auto_execution.py     # New: 16 tests
+```
+
+Keep secrets out of commits. Set `HL_API_PRIVATE_KEY` in Railway environment variables only.
 
 ## Universe (Signum-scale Top 100–150)
 

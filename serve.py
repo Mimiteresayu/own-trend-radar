@@ -37,6 +37,7 @@ ON_RAILWAY = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILW
 COOKIE_NAME = "otr_session"
 SESSION_SECRET = (os.environ.get("SESSION_SECRET") or PASSWORD or "dev-local").encode()
 ENTRY_READ_KEY = (os.environ.get("ENTRY_READ_KEY") or "").strip()
+AI_DECISION_KEY = (os.environ.get("AI_DECISION_KEY") or ENTRY_READ_KEY or "").strip()
 # Scheduler (Railway): UTC :05 after bar close. HKT = UTC+8.
 SCHEDULER_ENABLE = (os.environ.get("OTR_SCHEDULER") or ("1" if ON_RAILWAY else "0")).strip() in (
     "1",
@@ -56,6 +57,14 @@ try:
     from entry_candidates import build_candidates
 except ImportError:
     build_candidates = None  # type: ignore
+
+try:
+    from decisions import store_decisions, get_decisions_for_today
+    from trade_log import get_all_trades
+except ImportError:
+    store_decisions = None  # type: ignore
+    get_decisions_for_today = None  # type: ignore
+    get_all_trades = None  # type: ignore
 
 # Desk-data endpoint: HL wallet (public read-only)
 HL_ADDRESS = (os.environ.get("HL_ADDRESS") or os.environ.get("HL_WALLET") or "0xcFCda0F8576a268BaA17935368081F4e687dB122").strip()
@@ -645,10 +654,19 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/entry-candidates":
             self._entry_candidates(parsed.query)
             return
+        if path == "/api/ai/candidates":
+            self._ai_candidates(parsed.query)
+            return
+        if path == "/api/public/radar":
+            self._public_radar()
+            return
         if self._need_auth():
             return
         if path == "/api/desk-data":
             self._desk_data()
+            return
+        if path == "/api/trades":
+            self._get_trades()
             return
         if path in ("/", "/index.html"):
             self._send_file(UI_PATH, "text/html; charset=utf-8")
@@ -671,6 +689,9 @@ class Handler(SimpleHTTPRequestHandler):
             if self._need_auth():
                 return
             self._rescan()
+            return
+        if path == "/api/ai/decision":
+            self._ai_decision()
             return
         self.send_error(404, "Not Found")
 
@@ -825,6 +846,184 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    def _ai_candidates(self, query_str: str) -> None:
+        """GET /api/ai/candidates: keyed endpoint for AI to fetch today's candidates.
+        
+        Auth: query param key compared with AI_DECISION_KEY (fallback ENTRY_READ_KEY).
+        Returns 404 if AI_DECISION_KEY unset.
+        Returns 403 if key missing or invalid.
+        Returns 200 with enhanced candidate data for AI decision.
+        """
+        if not AI_DECISION_KEY:
+            self._send_json(404, {"ok": False, "error": "AI candidates endpoint disabled"})
+            return
+        
+        qs = parse_qs(query_str)
+        provided_key = (qs.get("key") or [""])[0]
+        
+        if not provided_key or not hmac.compare_digest(provided_key, AI_DECISION_KEY):
+            self._send_json(403, {"ok": False, "error": "forbidden"})
+            return
+        
+        # Load entry candidates
+        latest_path = os.path.join(OUT_DIR, "entry_candidates_latest.json")
+        try:
+            with open(latest_path) as f:
+                candidates_data = json.load(f)
+        except FileNotFoundError:
+            self._send_json(404, {"ok": False, "error": "entry candidates not yet generated"})
+            return
+        except Exception as e:
+            self._send_json(500, {"ok": False, "error": str(e)})
+            return
+        
+        # Get HL account state
+        try:
+            hl_data = _get_hl_cached()
+            account = _compute_unified_equity(hl_data)
+        except Exception as e:
+            account = {"error": str(e)}
+        
+        # Enhance candidates with suggested size/leverage
+        candidates = candidates_data.get("candidates", [])
+        enhanced = []
+        
+        for c in candidates:
+            tier = c.get("tier", "unknown")
+            trend_1d = c.get("trend_1d", "")
+            trend_4h = c.get("trend_4h", "")
+            sl_dist_pct = c.get("hard_sl_dist_pct", 0)
+            
+            # Suggested size % (simplified: Base 6%, Chase 8%, Continuation 3%)
+            entry_type = c.get("type", "Base")
+            if entry_type == "Continuation":
+                suggested_size_pct = 3.0
+            elif entry_type == "Chase":
+                suggested_size_pct = 8.0
+            else:
+                suggested_size_pct = 6.0
+            
+            # Suggested leverage (conservative: 2-3x)
+            suggested_leverage = 2.5
+            
+            # Estimated liquidation price (rough)
+            close_1d = c.get("close_1d", 0)
+            if close_1d and account.get("equity"):
+                equity = account["equity"]
+                size_usd = equity * (suggested_size_pct / 100.0)
+                liq_estimate = close_1d * (1 - (equity - size_usd / suggested_leverage) / size_usd)
+            else:
+                liq_estimate = None
+            
+            enhanced.append({
+                **c,
+                "suggested_size_pct": suggested_size_pct,
+                "suggested_leverage": suggested_leverage,
+                "estimated_liq_price": liq_estimate,
+            })
+        
+        # Build response
+        response = {
+            "generated_at": candidates_data.get("generated_at"),
+            "radar_1d_asof": candidates_data.get("radar_1d_asof"),
+            "radar_4h_asof": candidates_data.get("radar_4h_asof"),
+            "stale": candidates_data.get("stale", False),
+            "btc": candidates_data.get("btc", {}),
+            "count": len(enhanced),
+            "candidates": enhanced,
+            "account": account,
+        }
+        
+        self._send_json(200, response)
+
+    def _ai_decision(self) -> None:
+        """POST /api/ai/decision: store AI approval/veto decisions.
+        
+        Auth: header X-AI-Key or query param key.
+        Body: {decisions: [{symbol, decision: approve|veto, size_pct, leverage, reason}, ...]}
+        
+        Clamps size/leverage to SoT bands server-side.
+        """
+        # Auth check
+        auth_header = self.headers.get("X-AI-Key") or ""
+        query_str = urlparse(self.path).query
+        qs = parse_qs(query_str)
+        query_key = (qs.get("key") or [""])[0]
+        
+        provided_key = auth_header or query_key
+        
+        if not AI_DECISION_KEY:
+            self._send_json(404, {"ok": False, "error": "AI decision endpoint disabled"})
+            return
+        
+        if not provided_key or not hmac.compare_digest(provided_key, AI_DECISION_KEY):
+            self._send_json(403, {"ok": False, "error": "forbidden"})
+            return
+        
+        # Read body
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length) if length else b"{}"
+        
+        try:
+            body = json.loads(raw.decode())
+        except Exception:
+            self._send_json(400, {"ok": False, "error": "invalid json"})
+            return
+        
+        decisions = body.get("decisions")
+        if not isinstance(decisions, list):
+            self._send_json(400, {"ok": False, "error": "need {decisions: [...]}"})
+            return
+        
+        # Store decisions
+        if not store_decisions:
+            self._send_json(500, {"ok": False, "error": "decisions module not available"})
+            return
+        
+        try:
+            result = store_decisions(decisions)
+            self._send_json(200, result)
+        except Exception as e:
+            self._send_json(500, {"ok": False, "error": str(e)})
+
+    def _public_radar(self) -> None:
+        """GET /api/public/radar: public trimmed radar feed (no auth, no positions).
+        
+        Returns:
+            gc_radar_1h, gc_radar_4h, gc_radar_1d (from volume mount)
+            No positions, no account data, no keys required.
+        """
+        result: dict = {}
+        
+        # Radar JSONs from volume mount
+        for tf in ("1h", "4h", "1d"):
+            fp = os.path.join(OUT_DIR, f"gc_radar_{tf}.json")
+            try:
+                with open(fp) as f:
+                    data = json.load(f)
+                    result[f"gc_radar_{tf}"] = data
+            except Exception as e:
+                result[f"gc_radar_{tf}"] = {"error": str(e)}
+        
+        result["ts"] = datetime.now(timezone.utc).isoformat()
+        self._send_json(200, result)
+
+    def _get_trades(self) -> None:
+        """GET /api/trades: get all trades from trade log (password-gated).
+        
+        Returns:
+            trades: list of trade dicts
+        """
+        if not get_all_trades:
+            self._send_json(500, {"ok": False, "error": "trade_log module not available"})
+            return
+        
+        try:
+            trades = get_all_trades()
+            self._send_json(200, {"ok": True, "count": len(trades), "trades": trades})
+        except Exception as e:
+            self._send_json(500, {"ok": False, "error": str(e)})
 
     def _send_json(self, code: int, obj: dict) -> None:
         body = json.dumps(obj).encode("utf-8")

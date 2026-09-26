@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""AI decision storage for entry candidate approvals/vetos.
+
+Stores decisions as JSON with timestamp and reason.
+Each decision is keyed by symbol + date.
+"""
+from __future__ import annotations
+
+import json
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+ROOT = Path(__file__).resolve().parent
+DECISIONS_DIR = Path(os.environ.get("DECISIONS_DIR") or str(ROOT / "out" / "decisions"))
+
+
+def _ensure_dir() -> None:
+    """Ensure decisions directory exists."""
+    DECISIONS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _decision_file() -> Path:
+    """Return path to today's decision file (HKT date = UTC+8)."""
+    from datetime import timedelta
+    now_utc = datetime.now(timezone.utc)
+    hkt = now_utc + timedelta(hours=8)
+    date_str = hkt.strftime("%Y%m%d")
+    return DECISIONS_DIR / f"decisions_{date_str}.json"
+
+
+def store_decisions(decisions: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Store AI decisions for today.
+    
+    Args:
+        decisions: List of {symbol, decision: approve|veto, size_pct, leverage, reason}
+        
+    Returns:
+        dict with ok, stored_count, file_path
+    """
+    _ensure_dir()
+    
+    now = datetime.now(timezone.utc).isoformat()
+    file_path = _decision_file()
+    
+    # Load existing decisions for today if any
+    existing: Dict[str, Any] = {}
+    if file_path.is_file():
+        try:
+            existing = json.loads(file_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            pass
+    
+    # Ensure structure
+    if not isinstance(existing, dict) or "decisions" not in existing:
+        existing = {"decisions": {}, "history": []}
+    
+    # Store each decision
+    stored_count = 0
+    for dec in decisions:
+        symbol = str(dec.get("symbol", "")).upper().strip()
+        if not symbol:
+            continue
+        
+        decision_type = str(dec.get("decision", "")).lower()
+        if decision_type not in ("approve", "veto"):
+            continue
+        
+        # Build decision record
+        record = {
+            "symbol": symbol,
+            "decision": decision_type,
+            "size_pct": dec.get("size_pct"),
+            "leverage": dec.get("leverage"),
+            "reason": dec.get("reason", ""),
+            "timestamp": now,
+        }
+        
+        # Store in decisions map (latest decision per symbol)
+        existing["decisions"][symbol] = record
+        
+        # Append to history (all decisions)
+        existing["history"].append(record)
+        
+        stored_count += 1
+    
+    # Write back
+    file_path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+    
+    return {
+        "ok": True,
+        "stored_count": stored_count,
+        "file_path": str(file_path),
+        "timestamp": now,
+    }
+
+
+def get_decisions_for_today() -> Dict[str, Dict[str, Any]]:
+    """Get all decisions for today.
+    
+    Returns:
+        dict mapping symbol -> {decision, size_pct, leverage, reason, timestamp}
+    """
+    file_path = _decision_file()
+    if not file_path.is_file():
+        return {}
+    
+    try:
+        data = json.loads(file_path.read_text(encoding="utf-8"))
+        return data.get("decisions", {})
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def get_approved_symbols() -> List[str]:
+    """Return list of symbols approved for today."""
+    decisions = get_decisions_for_today()
+    return [
+        symbol
+        for symbol, rec in decisions.items()
+        if rec.get("decision") == "approve"
+    ]
+
+
+def clear_decisions_for_today() -> Dict[str, Any]:
+    """Clear today's decisions (for testing/reset).
+    
+    Returns:
+        dict with ok, message
+    """
+    file_path = _decision_file()
+    if file_path.is_file():
+        file_path.unlink()
+        return {"ok": True, "message": f"cleared {file_path}"}
+    return {"ok": True, "message": "no decisions to clear"}
+
+
+if __name__ == "__main__":
+    # Example usage
+    sample_decisions = [
+        {
+            "symbol": "BTC",
+            "decision": "approve",
+            "size_pct": 6.0,
+            "leverage": 3.0,
+            "reason": "Strong 1D uptrend, low SL distance",
+        },
+        {
+            "symbol": "ETH",
+            "decision": "veto",
+            "size_pct": None,
+            "leverage": None,
+            "reason": "BTC 4H below filter",
+        },
+    ]
+    
+    result = store_decisions(sample_decisions)
+    print(f"Stored: {result}")
+    
+    today = get_decisions_for_today()
+    print(f"Today's decisions: {json.dumps(today, indent=2)}")
+    
+    approved = get_approved_symbols()
+    print(f"Approved symbols: {approved}")
