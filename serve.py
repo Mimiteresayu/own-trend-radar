@@ -3,6 +3,7 @@
 
 Local:  python serve.py  → http://127.0.0.1:8787/  (no password unless set)
 Railway: password gate + POST /api/sync; background scanner writes out/gc_radar_*.json
+         + in-process APScheduler for auto-execution crons (Asia/Hong_Kong timezone)
 """
 from __future__ import annotations
 
@@ -37,7 +38,15 @@ ON_RAILWAY = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILW
 COOKIE_NAME = "otr_session"
 SESSION_SECRET = (os.environ.get("SESSION_SECRET") or PASSWORD or "dev-local").encode()
 ENTRY_READ_KEY = (os.environ.get("ENTRY_READ_KEY") or "").strip()
-# Scheduler (Railway): UTC :05 after bar close. HKT = UTC+8.
+AI_DECISION_KEY = (os.environ.get("AI_DECISION_KEY") or ENTRY_READ_KEY or "").strip()
+# New auto-execution scheduler (APScheduler in-process, Asia/Hong_Kong timezone)
+SCHEDULER_ENABLED = (os.environ.get("SCHEDULER_ENABLED") or ("1" if ON_RAILWAY else "0")).strip() in (
+    "1",
+    "true",
+    "yes",
+)
+# Legacy scheduler (Railway): UTC :05 after bar close. HKT = UTC+8.
+# NOTE: OTR_SCHEDULER is now deprecated in favor of SCHEDULER_ENABLED + APScheduler
 SCHEDULER_ENABLE = (os.environ.get("OTR_SCHEDULER") or ("1" if ON_RAILWAY else "0")).strip() in (
     "1",
     "true",
@@ -56,6 +65,25 @@ try:
     from entry_candidates import build_candidates
 except ImportError:
     build_candidates = None  # type: ignore
+
+try:
+    from decisions import store_decisions, get_decisions_for_today
+    from trade_log import get_all_trades
+except ImportError:
+    store_decisions = None  # type: ignore
+    get_decisions_for_today = None  # type: ignore
+    get_all_trades = None  # type: ignore
+
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.cron import CronTrigger
+    import pytz
+    HAS_APSCHEDULER = True
+except ImportError:
+    HAS_APSCHEDULER = False
+    BackgroundScheduler = None  # type: ignore
+    CronTrigger = None  # type: ignore
+    pytz = None  # type: ignore
 
 # Desk-data endpoint: HL wallet (public read-only)
 HL_ADDRESS = (os.environ.get("HL_ADDRESS") or os.environ.get("HL_WALLET") or "0xcFCda0F8576a268BaA17935368081F4e687dB122").strip()
@@ -505,6 +533,294 @@ def _log_desk_data() -> None:
         sys.stderr.write(f"[DESK_DATA] error: {e}\n")
 
 
+# =====================================================================
+# APScheduler: In-process cron jobs for auto-execution
+# =====================================================================
+
+# Scheduler state tracking
+_scheduler_jobs_status: dict[str, dict] = {}
+_scheduler_lock = threading.Lock()
+
+
+def _update_job_status(job_name: str, status: str, message: str = "", error: str = "") -> None:
+    """Update scheduler job status."""
+    with _scheduler_lock:
+        _scheduler_jobs_status[job_name] = {
+            "last_run": datetime.now(timezone.utc).isoformat(),
+            "status": status,
+            "message": message,
+            "error": error,
+        }
+
+
+def _get_scheduler_status() -> dict:
+    """Get current scheduler status for all jobs."""
+    with _scheduler_lock:
+        return dict(_scheduler_jobs_status)
+
+
+def _scheduled_1d_scan() -> None:
+    """Scheduled job: 1D scan + generate entry candidates (08:05 HKT daily)."""
+    job_name = "1d_scan_candidates"
+    
+    # Lock guard
+    if not _scan_lock.acquire(blocking=False):
+        _update_job_status(job_name, "skipped", "scan already running")
+        return
+    
+    try:
+        sys.stderr.write(f"[SCHEDULER] Starting {job_name}\n")
+        
+        # 1D scan
+        ok, note = _run_scan(["1d"], max_symbols=SCAN_MAX)
+        if not ok:
+            _update_job_status(job_name, "error", "", note)
+            sys.stderr.write(f"[SCHEDULER] {job_name} scan failed: {note[:200]}\n")
+            return
+        
+        # Generate entry candidates
+        if build_candidates:
+            _generate_entry_candidates()
+        
+        _update_job_status(job_name, "success", f"1D scan complete, {note}")
+        sys.stderr.write(f"[SCHEDULER] {job_name} completed: {note[:200]}\n")
+    except Exception as e:
+        _update_job_status(job_name, "error", "", str(e))
+        sys.stderr.write(f"[SCHEDULER] {job_name} exception: {e}\n")
+    finally:
+        _scan_lock.release()
+
+
+def _scheduled_1h_scan_exits() -> None:
+    """Scheduled job: 1H scan + Small/Tiny exits (hourly :05)."""
+    job_name = "1h_scan_exits"
+    
+    # Lock guard
+    if not _scan_lock.acquire(blocking=False):
+        _update_job_status(job_name, "skipped", "scan already running")
+        return
+    
+    try:
+        sys.stderr.write(f"[SCHEDULER] Starting {job_name}\n")
+        
+        # 1H scan
+        ok, note = _run_scan(["1h"], max_symbols=SCAN_MAX_1H)
+        if not ok:
+            _update_job_status(job_name, "error", "", note)
+            sys.stderr.write(f"[SCHEDULER] {job_name} scan failed: {note[:200]}\n")
+            return
+        
+        # Small/Tiny exits
+        exit_script = os.path.join(ROOT, "exit_worker.py")
+        if os.path.isfile(exit_script):
+            try:
+                proc = subprocess.run(
+                    [sys.executable, exit_script, "hourly"],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                exit_msg = "exits OK" if proc.returncode == 0 else f"exits failed: {proc.returncode}"
+            except Exception as e:
+                exit_msg = f"exits error: {e}"
+        else:
+            exit_msg = "exit_worker.py missing"
+        
+        _update_job_status(job_name, "success", f"1H scan + {exit_msg}")
+        sys.stderr.write(f"[SCHEDULER] {job_name} completed: {note[:200]}, {exit_msg}\n")
+        _log_desk_data()
+    except Exception as e:
+        _update_job_status(job_name, "error", "", str(e))
+        sys.stderr.write(f"[SCHEDULER] {job_name} exception: {e}\n")
+    finally:
+        _scan_lock.release()
+
+
+def _scheduled_4h_scan_exits() -> None:
+    """Scheduled job: 4H scan + Mega/Large exits (every 4h :05)."""
+    job_name = "4h_scan_exits"
+    
+    # Lock guard
+    if not _scan_lock.acquire(blocking=False):
+        _update_job_status(job_name, "skipped", "scan already running")
+        return
+    
+    try:
+        sys.stderr.write(f"[SCHEDULER] Starting {job_name}\n")
+        
+        # 4H scan
+        ok, note = _run_scan(["4h"], max_symbols=SCAN_MAX)
+        if not ok:
+            _update_job_status(job_name, "error", "", note)
+            sys.stderr.write(f"[SCHEDULER] {job_name} scan failed: {note[:200]}\n")
+            return
+        
+        # Mega/Large exits
+        exit_script = os.path.join(ROOT, "exit_worker.py")
+        if os.path.isfile(exit_script):
+            try:
+                proc = subprocess.run(
+                    [sys.executable, exit_script, "4h"],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                exit_msg = "exits OK" if proc.returncode == 0 else f"exits failed: {proc.returncode}"
+            except Exception as e:
+                exit_msg = f"exits error: {e}"
+        else:
+            exit_msg = "exit_worker.py missing"
+        
+        _update_job_status(job_name, "success", f"4H scan + {exit_msg}")
+        sys.stderr.write(f"[SCHEDULER] {job_name} completed: {note[:200]}, {exit_msg}\n")
+        _log_desk_data()
+    except Exception as e:
+        _update_job_status(job_name, "error", "", str(e))
+        sys.stderr.write(f"[SCHEDULER] {job_name} exception: {e}\n")
+    finally:
+        _scan_lock.release()
+
+
+def _scheduled_executor() -> None:
+    """Scheduled job: Execute approved candidates (08:55 HKT daily)."""
+    job_name = "executor"
+    
+    try:
+        sys.stderr.write(f"[SCHEDULER] Starting {job_name}\n")
+        
+        executor_script = os.path.join(ROOT, "executor.py")
+        if not os.path.isfile(executor_script):
+            _update_job_status(job_name, "error", "", "executor.py missing")
+            return
+        
+        proc = subprocess.run(
+            [sys.executable, executor_script],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=600,  # 10 min timeout
+        )
+        
+        if proc.returncode == 0:
+            try:
+                result = json.loads(proc.stdout)
+                executed = len(result.get("executed", []))
+                actions = len(result.get("actions", []))
+                skipped = len(result.get("skipped", []))
+                mode = result.get("mode", "?")
+                status = result.get("status", "unknown")
+                msg = f"{mode} {status}: executed={executed} actions={actions} skipped={skipped}"
+                _update_job_status(job_name, "success", msg)
+                sys.stderr.write(f"[SCHEDULER] {job_name} completed: {msg}\n")
+            except Exception:
+                _update_job_status(job_name, "success", "executor ran (status unknown)")
+        else:
+            err = (proc.stderr or proc.stdout or "executor failed")[-1000:]
+            _update_job_status(job_name, "error", "", err)
+            sys.stderr.write(f"[SCHEDULER] {job_name} failed: {err[:200]}\n")
+    except subprocess.TimeoutExpired:
+        _update_job_status(job_name, "error", "", "executor timed out (>600s)")
+    except Exception as e:
+        _update_job_status(job_name, "error", "", str(e))
+        sys.stderr.write(f"[SCHEDULER] {job_name} exception: {e}\n")
+
+
+def _init_scheduler() -> BackgroundScheduler | None:
+    """Initialize APScheduler with cron jobs (Asia/Hong_Kong timezone)."""
+    if not HAS_APSCHEDULER:
+        sys.stderr.write("[SCHEDULER] APScheduler not available, skipping\n")
+        return None
+    
+    if not SCHEDULER_ENABLED:
+        sys.stderr.write("[SCHEDULER] SCHEDULER_ENABLED=0, skipping\n")
+        return None
+    
+    try:
+        hkt = pytz.timezone("Asia/Hong_Kong")
+        scheduler = BackgroundScheduler(timezone=hkt)
+        
+        # 08:05 HKT daily: 1D scan + generate entry candidates
+        scheduler.add_job(
+            _scheduled_1d_scan,
+            CronTrigger(hour=8, minute=5, timezone=hkt),
+            id="1d_scan_candidates",
+            name="1D Scan + Entry Candidates",
+            max_instances=1,
+            coalesce=True,
+        )
+        
+        # Hourly :05: 1H scan + Small/Tiny exits
+        scheduler.add_job(
+            _scheduled_1h_scan_exits,
+            CronTrigger(minute=5, timezone=hkt),
+            id="1h_scan_exits",
+            name="1H Scan + Small/Tiny Exits",
+            max_instances=1,
+            coalesce=True,
+        )
+        
+        # Every 4h :05: 4H scan + Mega/Large exits
+        scheduler.add_job(
+            _scheduled_4h_scan_exits,
+            CronTrigger(hour="0,4,8,12,16,20", minute=5, timezone=hkt),
+            id="4h_scan_exits",
+            name="4H Scan + Mega/Large Exits",
+            max_instances=1,
+            coalesce=True,
+        )
+        
+        # 08:55 HKT daily: Execute approved candidates
+        scheduler.add_job(
+            _scheduled_executor,
+            CronTrigger(hour=8, minute=55, timezone=hkt),
+            id="executor",
+            name="Auto-Executor",
+            max_instances=1,
+            coalesce=True,
+        )
+        
+        scheduler.start()
+        sys.stderr.write(
+            "[SCHEDULER] APScheduler started (Asia/Hong_Kong timezone)\n"
+            "  - 08:05 HKT: 1D scan + entry candidates\n"
+            "  - Hourly :05: 1H scan + Small/Tiny exits\n"
+            "  - Every 4h :05: 4H scan + Mega/Large exits\n"
+            "  - 08:55 HKT: Auto-executor\n"
+        )
+        return scheduler
+    except Exception as e:
+        sys.stderr.write(f"[SCHEDULER] Failed to initialize: {e}\n")
+        return None
+
+
+def _log_desk_data() -> None:
+    """One-line summary of scan completion (reduced from full JSON dump)."""
+    try:
+        radar_ts = {}
+        pos_count = {}
+        for tf in ("1h", "4h", "1d"):
+            fp = os.path.join(OUT_DIR, f"gc_radar_{tf}.json")
+            try:
+                with open(fp) as f:
+                    data = json.load(f)
+                    radar_ts[tf] = data.get("ts", "")[:19]
+                    rows = data.get("rows") or []
+                    pos_count[tf] = len(rows)
+            except Exception:
+                radar_ts[tf] = "error"
+                pos_count[tf] = 0
+        sys.stderr.write(
+            f"[DESK_DATA] {datetime.now(timezone.utc).isoformat()[:19]} "
+            f"radar_1h={pos_count['1h']}@{radar_ts['1h']} "
+            f"radar_4h={pos_count['4h']}@{radar_ts['4h']} "
+            f"radar_1d={pos_count['1d']}@{radar_ts['1d']}\n"
+        )
+    except Exception as e:
+        sys.stderr.write(f"[DESK_DATA] error: {e}\n")
+
+
 def _scheduler_loop() -> None:
     global _last_failsafe
     sys.stderr.write(
@@ -637,6 +953,7 @@ class Handler(SimpleHTTPRequestHandler):
                 {
                     "ok": True,
                     "scheduler": SCHEDULER_ENABLE,
+                    "scheduler_enabled": SCHEDULER_ENABLED,
                     "last_scan": dict(_last_scan),
                     "scanner": os.path.isfile(SCAN_SCRIPT),
                 },
@@ -645,10 +962,22 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/entry-candidates":
             self._entry_candidates(parsed.query)
             return
+        if path == "/api/ai/candidates":
+            self._ai_candidates(parsed.query)
+            return
+        if path == "/api/public/radar":
+            self._public_radar()
+            return
+        if path == "/api/scheduler/status":
+            self._scheduler_status()
+            return
         if self._need_auth():
             return
         if path == "/api/desk-data":
             self._desk_data()
+            return
+        if path == "/api/trades":
+            self._get_trades()
             return
         if path in ("/", "/index.html"):
             self._send_file(UI_PATH, "text/html; charset=utf-8")
@@ -671,6 +1000,9 @@ class Handler(SimpleHTTPRequestHandler):
             if self._need_auth():
                 return
             self._rescan()
+            return
+        if path == "/api/ai/decision":
+            self._ai_decision()
             return
         self.send_error(404, "Not Found")
 
@@ -775,6 +1107,7 @@ class Handler(SimpleHTTPRequestHandler):
             gc_radar_1h, gc_radar_4h, gc_radar_1d (from volume),
             account (computed from Unified mode),
             positions (with tier-based stops),
+            scheduler (APScheduler job status if enabled),
             ts, address
         }
         """
@@ -808,6 +1141,10 @@ class Handler(SimpleHTTPRequestHandler):
         positions = _compute_positions_with_stops(hl_data, radar_1h or {}, radar_4h or {})
         result["positions"] = positions
         
+        # 5) Scheduler status (if enabled)
+        if SCHEDULER_ENABLED:
+            result["scheduler"] = _get_scheduler_status()
+        
         result["ts"] = datetime.now(timezone.utc).isoformat()
         result["address"] = HL_ADDRESS
         self._send_json(200, result)
@@ -825,6 +1162,205 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    def _ai_candidates(self, query_str: str) -> None:
+        """GET /api/ai/candidates: keyed endpoint for AI to fetch today's candidates.
+        
+        Auth: query param key compared with AI_DECISION_KEY (fallback ENTRY_READ_KEY).
+        Returns 404 if AI_DECISION_KEY unset.
+        Returns 403 if key missing or invalid.
+        Returns 200 with enhanced candidate data for AI decision.
+        """
+        if not AI_DECISION_KEY:
+            self._send_json(404, {"ok": False, "error": "AI candidates endpoint disabled"})
+            return
+        
+        qs = parse_qs(query_str)
+        provided_key = (qs.get("key") or [""])[0]
+        
+        if not provided_key or not hmac.compare_digest(provided_key, AI_DECISION_KEY):
+            self._send_json(403, {"ok": False, "error": "forbidden"})
+            return
+        
+        # Load entry candidates
+        latest_path = os.path.join(OUT_DIR, "entry_candidates_latest.json")
+        try:
+            with open(latest_path) as f:
+                candidates_data = json.load(f)
+        except FileNotFoundError:
+            self._send_json(404, {"ok": False, "error": "entry candidates not yet generated"})
+            return
+        except Exception as e:
+            self._send_json(500, {"ok": False, "error": str(e)})
+            return
+        
+        # Get HL account state
+        try:
+            hl_data = _get_hl_cached()
+            account = _compute_unified_equity(hl_data)
+        except Exception as e:
+            account = {"error": str(e)}
+        
+        # Enhance candidates with suggested size/leverage
+        candidates = candidates_data.get("candidates", [])
+        enhanced = []
+        
+        for c in candidates:
+            tier = c.get("tier", "unknown")
+            trend_1d = c.get("trend_1d", "")
+            trend_4h = c.get("trend_4h", "")
+            sl_dist_pct = c.get("hard_sl_dist_pct", 0)
+            
+            # Suggested size % (simplified: Base 6%, Chase 8%, Continuation 3%)
+            entry_type = c.get("type", "Base")
+            if entry_type == "Continuation":
+                suggested_size_pct = 3.0
+            elif entry_type == "Chase":
+                suggested_size_pct = 8.0
+            else:
+                suggested_size_pct = 6.0
+            
+            # Suggested leverage (conservative: 2-3x)
+            suggested_leverage = 2.5
+            
+            # Estimated liquidation price (rough)
+            close_1d = c.get("close_1d", 0)
+            if close_1d and account.get("equity"):
+                equity = account["equity"]
+                size_usd = equity * (suggested_size_pct / 100.0)
+                liq_estimate = close_1d * (1 - (equity - size_usd / suggested_leverage) / size_usd)
+            else:
+                liq_estimate = None
+            
+            enhanced.append({
+                **c,
+                "suggested_size_pct": suggested_size_pct,
+                "suggested_leverage": suggested_leverage,
+                "estimated_liq_price": liq_estimate,
+            })
+        
+        # Build response
+        response = {
+            "generated_at": candidates_data.get("generated_at"),
+            "radar_1d_asof": candidates_data.get("radar_1d_asof"),
+            "radar_4h_asof": candidates_data.get("radar_4h_asof"),
+            "stale": candidates_data.get("stale", False),
+            "btc": candidates_data.get("btc", {}),
+            "count": len(enhanced),
+            "candidates": enhanced,
+            "account": account,
+        }
+        
+        self._send_json(200, response)
+
+    def _ai_decision(self) -> None:
+        """POST /api/ai/decision: store AI approval/veto decisions.
+        
+        Auth: header X-AI-Key or query param key.
+        Body: {decisions: [{symbol, decision: approve|veto, size_pct, leverage, reason}, ...]}
+        
+        Clamps size/leverage to SoT bands server-side.
+        """
+        # Auth check
+        auth_header = self.headers.get("X-AI-Key") or ""
+        query_str = urlparse(self.path).query
+        qs = parse_qs(query_str)
+        query_key = (qs.get("key") or [""])[0]
+        
+        provided_key = auth_header or query_key
+        
+        if not AI_DECISION_KEY:
+            self._send_json(404, {"ok": False, "error": "AI decision endpoint disabled"})
+            return
+        
+        if not provided_key or not hmac.compare_digest(provided_key, AI_DECISION_KEY):
+            self._send_json(403, {"ok": False, "error": "forbidden"})
+            return
+        
+        # Read body
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length) if length else b"{}"
+        
+        try:
+            body = json.loads(raw.decode())
+        except Exception:
+            self._send_json(400, {"ok": False, "error": "invalid json"})
+            return
+        
+        decisions = body.get("decisions")
+        if not isinstance(decisions, list):
+            self._send_json(400, {"ok": False, "error": "need {decisions: [...]}"})
+            return
+        
+        # Store decisions
+        if not store_decisions:
+            self._send_json(500, {"ok": False, "error": "decisions module not available"})
+            return
+        
+        try:
+            result = store_decisions(decisions)
+            self._send_json(200, result)
+        except Exception as e:
+            self._send_json(500, {"ok": False, "error": str(e)})
+
+    def _public_radar(self) -> None:
+        """GET /api/public/radar: public trimmed radar feed (no auth, no positions).
+        
+        Returns:
+            gc_radar_1h, gc_radar_4h, gc_radar_1d (from volume mount)
+            No positions, no account data, no keys required.
+        """
+        result: dict = {}
+        
+        # Radar JSONs from volume mount
+        for tf in ("1h", "4h", "1d"):
+            fp = os.path.join(OUT_DIR, f"gc_radar_{tf}.json")
+            try:
+                with open(fp) as f:
+                    data = json.load(f)
+                    result[f"gc_radar_{tf}"] = data
+            except Exception as e:
+                result[f"gc_radar_{tf}"] = {"error": str(e)}
+        
+        result["ts"] = datetime.now(timezone.utc).isoformat()
+        self._send_json(200, result)
+
+    def _scheduler_status(self) -> None:
+        """GET /api/scheduler/status: password-gated endpoint for scheduler job status.
+        
+        Returns:
+            enabled: bool
+            jobs: dict of job_name -> {last_run, status, message, error}
+        """
+        if not SCHEDULER_ENABLED:
+            self._send_json(200, {
+                "enabled": False,
+                "message": "Scheduler is disabled (SCHEDULER_ENABLED=0)",
+            })
+            return
+        
+        status = _get_scheduler_status()
+        self._send_json(200, {
+            "enabled": True,
+            "jobs": status,
+            "ts": datetime.now(timezone.utc).isoformat(),
+        })
+
+    def _get_trades(self) -> None:
+        """GET /api/trades: get all trades from trade log (password-gated).
+        
+        Returns:
+            trades: list of trade dicts
+        """
+        if not get_all_trades:
+            self._send_json(500, {"ok": False, "error": "trade_log module not available"})
+            return
+        
+        try:
+            trades = get_all_trades()
+            self._send_json(200, {"ok": True, "count": len(trades), "trades": trades})
+        except Exception as e:
+            self._send_json(500, {"ok": False, "error": str(e)})
 
     def _send_json(self, code: int, obj: dict) -> None:
         body = json.dumps(obj).encode("utf-8")
@@ -898,13 +1434,22 @@ class Handler(SimpleHTTPRequestHandler):
 def main() -> None:
     os.chdir(ROOT)
     os.makedirs(OUT_DIR, exist_ok=True)
-    if SCHEDULER_ENABLE:
+    
+    # Initialize APScheduler (new in-process scheduler)
+    scheduler = None
+    if SCHEDULER_ENABLED:
+        scheduler = _init_scheduler()
+    
+    # Start legacy scheduler thread (deprecated, only if OTR_SCHEDULER=1 and SCHEDULER_ENABLED=0)
+    if SCHEDULER_ENABLE and not SCHEDULER_ENABLED:
         t = threading.Thread(target=_scheduler_loop, name="otr-scheduler", daemon=True)
         t.start()
+    
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"Own Trend Radar UI → http://0.0.0.0:{PORT}/", flush=True)
     print(
-        f"password_gate={'on' if PASSWORD else 'off'} railway={ON_RAILWAY} scheduler={SCHEDULER_ENABLE}",
+        f"password_gate={'on' if PASSWORD else 'off'} railway={ON_RAILWAY} "
+        f"scheduler_enabled={SCHEDULER_ENABLED} legacy_scheduler={SCHEDULER_ENABLE}",
         flush=True,
     )
     try:
@@ -912,6 +1457,8 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\nbye", flush=True)
     finally:
+        if scheduler:
+            scheduler.shutdown()
         server.server_close()
 
 
